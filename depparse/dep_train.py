@@ -243,5 +243,5 @@ def test_train(base_path,
 		pos_embed_size = pos_embed_size, encoder = encoder, lstm_hidden_size = lstm_hidden_size, lr = lr, dropout = dropout, num_epochs = num_epochs, lstm_layers = lstm_layers, batch_size = batch_size, bert = bert, bert_layer = bert_layer, scale = scale, 
 		typological = typological, typ_size = typ_size, typ_features = typ_features, typ_feature_vec = typ_feature_vec)
 
-test_train(base_path = base_path, train_filename = train_filename, valid_filename = valid_filename, modelname = 'dep3_lstm.pt', train_type = 'lemma_ids', num_epochs = 10, 
+test_train(base_path = base_path, train_filename = train_filename, valid_filename = valid_filename, modelname = 'dep1_lstm.pt', train_type = 'word_ids', num_epochs = 10, 
 	encoder = 'lstm', dropout = 0.33)
