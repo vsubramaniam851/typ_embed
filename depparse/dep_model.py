@@ -29,8 +29,8 @@ class BiaffineDependencyModel(nn.Module):
 		pad_index = -1, 
 		unk_index = 0, 
 		typological = False, 
-		typ_size = 200, 
-		typ_features = 289):
+		typ_embed_size = 32, 
+		num_typ_features = 289):
 
 		super(BiaffineDependencyModel, self).__init__()
 
@@ -38,16 +38,16 @@ class BiaffineDependencyModel(nn.Module):
 		self.pad_index = pad_index 
 		if encoder == 'lstm':
 			self.encode = LSTMEmbedding(num_words = n_words, num_pos = n_pos, lstm_layers = lstm_layers, word_embed_size = word_embed_size, pos_embed_size = pos_embed_size, 
-				lstm_hidden_size = lstm_hidden_size, dropout = dropout, typological = typological, typ_size = typ_size, typ_features = typ_features)
+				lstm_hidden_size = lstm_hidden_size, dropout = dropout, typological = typological, typ_embed_size = typ_embed_size, num_typ_features = num_typ_features)
 			n_embed = lstm_hidden_size * 2
 		elif encoder == 'bert':
-			self.encode = BERTEmbedding(bert = bert, typological = typological, bert_pad_index = bert_pad_index, bert_hidden_size = n_embed, typ_size = 200, typ_features = typ_features, bert_layer = n_bert_layer)
+			self.encode = BERTEmbedding(bert = bert, typological = typological, bert_pad_index = bert_pad_index, bert_hidden_size = n_embed, typ_embed_size = typ_embed_size, num_typ_features = num_typ_features, bert_layer = n_bert_layer)
 			n_embed = 768
 		else:
 			n_embed = 0
 			raise NameError('Please choose either LSTM or BERT Embedding')
 		if typological:
-			n_embed = n_embed + typ_size
+			n_embed = n_embed + typ_embed_size
 		self.arc_mlp_d = MLP(n_in = n_embed, n_out = n_arc_mlp, dropout = dropout)
 		self.arc_mlp_h = MLP(n_in = n_embed, n_out = n_arc_mlp, dropout = dropout)
 		self.rel_mlp_d = MLP(n_in = n_embed, n_out = n_rel_mlp, dropout = dropout)
@@ -57,14 +57,12 @@ class BiaffineDependencyModel(nn.Module):
 		self.rel_attn = Biaffine(n_in = n_rel_mlp, n_out = n_rels, bias_x = True, bias_y = True)
 		self.criterion = nn.CrossEntropyLoss()
 
-	def forward(self, words, lang_typ = None, pos_tags = None, input_ids = None, attention_mask = None):
+	def forward(self, words, lang = 'en', typ_feature = 'syntax_knn+phonology_knn+inventory_knn', pos_tags = None, input_ids = None, attention_mask = None, device = 'cpu'):
 		if self.encoder == 'lstm':
-			x = self.encode(words, pos_tags, lang_typ)
+			x = self.encode(words = words, pos_tags = pos_tags, lang = lang, typ_features = typ_features, device = device)
 		else:
-			x = self.encode(input_ids, attention_mask, lang_typ)
+			x = self.encode(input_ids = input_ids, attention_mask = attention_mask, lang = lang, typ_features = typ_features, device = device)
 		mask = words.ne(self.pad_index) if len(words.shape) < 3 else words.ne(self.pad_index).any(-1)
-
-		# print('X SIZE:', x.size())
 
 		arc_d = self.arc_mlp_d(x)
 		arc_h = self.arc_mlp_h(x)
