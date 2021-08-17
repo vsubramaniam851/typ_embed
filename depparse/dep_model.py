@@ -41,7 +41,7 @@ class BiaffineDependencyModel(nn.Module):
 				lstm_hidden_size = lstm_hidden_size, dropout = dropout, typological = typological, typ_embed_size = typ_embed_size, num_typ_features = num_typ_features)
 			n_embed = lstm_hidden_size * 2
 		elif encoder == 'bert':
-			self.encode = BERTEmbedding(bert = bert, typological = typological, bert_pad_index = bert_pad_index, bert_hidden_size = n_embed, typ_embed_size = typ_embed_size, num_typ_features = num_typ_features, bert_layer = n_bert_layer)
+			self.encode = BERTEmbedding(bert = bert, typological = typological, bert_pad_index = bert_pad_index, bert_hidden_size = 768, typ_embed_size = typ_embed_size, num_typ_features = num_typ_features, bert_layer = n_bert_layer)
 			n_embed = 768
 		else:
 			n_embed = 0
@@ -59,9 +59,9 @@ class BiaffineDependencyModel(nn.Module):
 
 	def forward(self, words, lang = 'en', typ_feature = 'syntax_knn+phonology_knn+inventory_knn', pos_tags = None, input_ids = None, attention_mask = None, device = 'cpu'):
 		if self.encoder == 'lstm':
-			x = self.encode(words = words, pos_tags = pos_tags, lang = lang, typ_features = typ_features, device = device)
+			x = self.encode(words = words, pos_tags = pos_tags, lang = lang, typ_feature = typ_feature, device = device)
 		else:
-			x = self.encode(input_ids = input_ids, attention_mask = attention_mask, lang = lang, typ_features = typ_features, device = device)
+			x = self.encode(input_ids = input_ids, attention_mask = attention_mask, lang = lang, typ_feature = typ_feature, device = device)
 		mask = words.ne(self.pad_index) if len(words.shape) < 3 else words.ne(self.pad_index).any(-1)
 
 		arc_d = self.arc_mlp_d(x)

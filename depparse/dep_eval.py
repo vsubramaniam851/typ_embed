@@ -53,9 +53,9 @@ def arc_eval(base_path,
 	pad_index = num_words
 	classifier = BiaffineDependencyModel(n_words = num_words, n_pos = num_pos, n_rels = num_labels, word_embed_size = word_embed_size, pos_embed_size = pos_embed_size,  
 		encoder = encoder, lstm_hidden_size = lstm_hidden_size, lstm_layers = lstm_layers, bert = bert, bert_pad_index = 0, dropout = dropout, n_bert_layer = bert_layer, 
-		n_arc_mlp = 500, n_rel_mlp = 100, scale = scale, pad_index = pad_index, unk_index = 0, typological = typological, typ_embed_size = typ_size, num_typ_features = num_typ_features)
+		n_arc_mlp = 500, n_rel_mlp = 100, scale = scale, pad_index = pad_index, unk_index = 0, typological = typological, typ_embed_size = typ_embed_size, num_typ_features = num_typ_features)
 
-	model_loc = os.path.join(base_path, 'checkpoints', modelname)
+	model_loc = os.path.join(base_path, 'saved_models', modelname)
 	classifier.load_state_dict(torch.load(model_loc))
 	
 	classifier = classifier.to(device)
@@ -81,8 +81,8 @@ def arc_eval(base_path,
 			input_ids = []
 			attention_mask = []
 			word_batch = []
-			input_ids.append(torch.tensor(sent['input_ids']).long().to(device))
-			attention_mask.append(torch.tensor(sent['attention_mask']).long().to(device))
+			input_ids.append(torch.tensor(sent_dict['input_ids']).long().to(device))
+			attention_mask.append(torch.tensor(sent_dict['attention_mask']).long().to(device))
 			word_batch.append(torch.tensor(sent_dict[eval_input]).long().to(device))
 
 			input_ids = torch.stack(input_ids).to(device)
@@ -128,13 +128,14 @@ def test_eval(base_path,
 	lstm_hidden_size = 400,
 	dropout = 0.25,
 	lstm_layers = 3,
-	bert = 'bert-based-uncased',
-	bert_layer = 4,
+	bert = 'bert-base-uncased',
+	bert_layer = 7,
 	scale = 0,
 	typological = False,
 	typ_embed_size = 32,
 	num_typ_features = 289,
-	typ_feature = None,
+	typ_feature = 'syntax_knn+phonology_knn+inventory_knn',
+	lang = 'en',
 	device = 'cpu'):
 	
 	file_path = os.path.join(base_path, 'UD_English-EWT')
@@ -156,7 +157,11 @@ def test_eval(base_path,
 	num_labels = len(label_dict)
 	num_pos = len(pos_dict)
 
-	print(arc_eval(base_path = base_path, test_corpus = test_corpus, eval_input = eval_input, num_words = num_words, num_pos = num_pos, num_labels = num_labels, modelname = modelname, word_embed_size = word_embed_size, pos_embed_size = pos_embed_size, encoder = encoder, lstm_hidden_size = lstm_hidden_size, dropout = dropout, 
-		lstm_layers = lstm_layers, bert = bert, bert_layer = bert_layer, scale = scale, typological = typological, typ_size = typ_size, typ_features = typ_features, typ_feature_vec = typ_feature_vec))
+	if encoder == 'bert':
+		test_corpus = bert_tokenizer(test_corpus)
 
-test_eval(base_path = base_path, train_filename = train_filename, test_filename = test_filename, eval_input = 'word_ids', modelname = 'dep1_lstm.pt', dropout = 0.33, device = device)
+	print(arc_eval(base_path = base_path, test_corpus = test_corpus, eval_input = eval_input, num_words = num_words, num_pos = num_pos, num_labels = num_labels, modelname = modelname, word_embed_size = word_embed_size, pos_embed_size = pos_embed_size, encoder = encoder, lstm_hidden_size = lstm_hidden_size, dropout = dropout, 
+		lstm_layers = lstm_layers, bert = bert, bert_layer = bert_layer, scale = scale, typological = typological, typ_embed_size = typ_embed_size, typ_feature = typ_feature, lang = lang, device = device))
+
+test_eval(base_path = base_path, train_filename = train_filename, test_filename = test_filename, eval_input = 'word_ids', modelname = 'dep2_bert.pt', dropout = 0.33, device = device,
+	encoder = 'bert')

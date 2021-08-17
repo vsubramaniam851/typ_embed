@@ -50,7 +50,7 @@ def arc_train(base_path,
 	pos_embed_size = 100,
 	encoder = 'lstm', 
 	lstm_hidden_size = 400,
-	lr = 0.005, 
+	lr = 0.0005, 
 	dropout = 0.33, 
 	num_epochs = 3, 
 	lstm_layers = 3, 
@@ -61,6 +61,7 @@ def arc_train(base_path,
 	typological = False,
 	typ_embed_size = 32,
 	num_typ_features = 289,
+	typ_feature = 'syntax_knn+phonology_knn+inventory_knn',
 	lang = 'en',
 	device = 'cpu'):
 	'''Train the model. Specify the model type and hyperparameters. The LSTM model takes in lemmas in a sentence and predicts its heads and dependencies
@@ -77,14 +78,21 @@ def arc_train(base_path,
 	optimizer = optim.Adam(classifier.parameters(), lr = lr)
 
 	classifier = classifier.to(device)
+	classifier = classifier.double()
 	classifier.train()
 
 	#Collect correct label types
 	label1 = 'heads'
 	label2 = 'deprel_ids'
 
+
+	if typological:
+		typ_str = 'with'
+	else:
+		typ_str = 'without'
+
 	#Training loop
-	print('Beginning training on {} with encoder {}'.format(train_type, encoder))
+	print('Beginning training on {} with encoder {} and {} typological features'.format(train_type, encoder, typ_str))
 	for epoch in range(num_epochs):
 		total_loss = 0
 		classifier.train()
@@ -109,7 +117,7 @@ def arc_train(base_path,
 				rels = torch.stack(rels).to(device)
 				# rels = rels.squeeze(0)
 
-				s_arc, s_rel, mask = classifier.forward(words = word_batch, lang = lang, typ_features = typ_features, pos_tags = pos_batch, device = device)
+				s_arc, s_rel, mask = classifier.forward(words = word_batch, lang = lang, typ_feature = typ_feature, pos_tags = pos_batch, device = device)
 			else:
 				input_ids = []
 				attention_mask = []
@@ -130,7 +138,7 @@ def arc_train(base_path,
 				rels = torch.stack(rels).to(device)
 				# rels = rels.squeeze(0)
 		
-				s_arc, s_rel, mask = classifier.forward(words = word_batch, input_ids = input_ids, attention_mask = attention_mask, lang = lang, typ_features = typ_features, device = device)
+				s_arc, s_rel, mask = classifier.forward(words = word_batch, input_ids = input_ids, attention_mask = attention_mask, lang = lang, typ_feature = typ_feature, device = device)
 
 			#Calculate loss and step backwards through the model.
 			loss = classifier.loss(s_arc = s_arc, s_rel = s_rel, arcs = arcs, rels = rels, mask = mask)
@@ -164,7 +172,7 @@ def arc_train(base_path,
 				rels = torch.stack(rels).to(device)
 				# rels = rels.squeeze(0)
 
-				s_arc, s_rel, mask = classifier.forward(words = word_batch, lang_typ = typ_feature_vec, pos_tags = pos_batch)
+				s_arc, s_rel, mask = classifier.forward(words = word_batch, lang = lang, typ_feature = typ_feature, pos_tags = pos_batch, device = device)
 			else:
 				input_ids = []
 				attention_mask = []
@@ -185,7 +193,7 @@ def arc_train(base_path,
 				rels = torch.stack(rels).to(device)
 				# rels = rels.squeeze(0)
 		
-				s_arc, s_rel, mask = classifier.forward(words = word_batch, input_ids = input_ids, attention_mask = attention_mask, lang_typ = typ_feature_vec)
+				s_arc, s_rel, mask = classifier.forward(words = word_batch, input_ids = input_ids, attention_mask = attention_mask, lang = lang, typ_feature = typ_feature, device = device)
 
 			#Calculate loss and add to total loss.
 			loss = classifier.loss(s_arc = s_arc, s_rel = s_rel, arcs = arcs, rels = rels, mask = mask)
@@ -193,7 +201,7 @@ def arc_train(base_path,
 		print('Epoch {}, valid loss={}'.format(epoch, total_loss / len(valid_corpus)))
 	print('TRAINING IS FINISHED')
 	#Save model using modelname passed in as parameter
-	save_path = os.path.join(base_path, 'checkpoints', modelname)
+	save_path = os.path.join(base_path, 'saved_models', modelname)
 	torch.save(classifier.state_dict(), save_path)
 
 def test_train(base_path, 
@@ -211,14 +219,14 @@ def test_train(base_path,
 	lstm_layers = 3, 
 	batch_size = 1,
 	bert = 'bert-base-uncased',
-	bert_layer = 4,
+	bert_layer = 7,
 	scale = 0,
-	typological = False,
-	typ_size = 200,
-	num_typ_features = 289,
-	typ_feature= 'syntax_knn+phonology_knn+inventory_knn',
+	typological = True,
+	typ_embed_size = 32,
+	num_typ_features = 103,
+	typ_feature= 'syntax_knn',
 	lang = 'en',
-	device = 'cuda'):
+	device = 'cpu'):
 	
 	#Load data
 	print('Loading data from training file {} and validation file {}'.format(train_filename, valid_filename))
@@ -248,5 +256,5 @@ def test_train(base_path,
 		pos_embed_size = pos_embed_size, encoder = encoder, lstm_hidden_size = lstm_hidden_size, lr = lr, dropout = dropout, num_epochs = num_epochs, lstm_layers = lstm_layers, batch_size = batch_size, bert = bert, bert_layer = bert_layer, scale = scale, 
 		typological = typological, typ_embed_size = typ_embed_size, num_typ_features = num_typ_features, typ_feature = typ_feature, lang = lang, device = device)
 
-test_train(base_path = base_path, train_filename = train_filename, valid_filename = valid_filename, modelname = 'dep2_lstm.pt', train_type = 'word_ids', num_epochs = 10, 
+test_train(base_path = base_path, train_filename = train_filename, valid_filename = valid_filename, modelname = 'dep1_lstm_typ.pt', train_type = 'lemma_ids', num_epochs = 10, 
 	encoder = 'lstm', dropout = 0.33, device = device)

@@ -9,14 +9,14 @@ import lang2vec.lang2vec as l2v
 
 class TypologicalLanguageEmbed(nn.Module):
 	def __init__(self, num_typ_features, typ_embed_size, hidden_size, dropout = 0.25):
-		suoer(TypologicalLanguageEmbed, self).__init__()
+		super(TypologicalLanguageEmbed, self).__init__()
 		self.linear1 = nn.Linear(num_typ_features, hidden_size)
 		self.linear2 = nn.Linear(hidden_size, typ_embed_size)
 		self.activation = nn.ReLU()
 		self.dropout = nn.Dropout(dropout)
 
-	def forward(lang, typ_feature, device = 'cpu'):
-		f_vec = torch.tensor(l2v.get_features(l2v.LETTER_CODES[lang], typ_features)[l2v.LETTER_CODES[lang]]).to(device)
+	def forward(self, lang, typ_feature, device = 'cpu'):
+		f_vec = torch.tensor(l2v.get_features(l2v.LETTER_CODES[lang], typ_feature)[l2v.LETTER_CODES[lang]]).double().to(device)
 		x = self.linear1(f_vec)
 		x = self.linear2(x)
 		x = self.activation(x)
@@ -43,7 +43,7 @@ class LSTMEmbedding(nn.Module):
 		self.lstm = nn.LSTM(word_embed_size+pos_embed_size, lstm_hidden_size, num_layers = lstm_layers, dropout = dropout, batch_first = True, bidirectional = True)
 		self.dropout = nn.Dropout(dropout)
 		if typological:
-			self.typ = TypologicalLanguageEmbed(num_typ_features = num_typ_features, typ_embed_size = typ_embed_size, hidden_size = num_typ_features, dropout = dropout, device = device)
+			self.typ = TypologicalLanguageEmbed(num_typ_features = num_typ_features, typ_embed_size = typ_embed_size, hidden_size = num_typ_features, dropout = dropout)
 		else:
 			self.typ = None
 		self.typological = typological
@@ -59,12 +59,12 @@ class LSTMEmbedding(nn.Module):
 
 		if self.typological:
 			lstm_embeddings = []
-			typ_embeds = self.typ(lang = lang, typ_feature = typ_features, device = device)
+			typ_embeds = self.typ(lang = lang, typ_feature = typ_feature, device = device)
 			for i in range(len(outputs)):
 				word_vec = outputs[i]
-				typ_word_vec = torch.cat([word_vec, typ_embeds], dim = 1)
+				typ_word_vec = torch.cat([word_vec, typ_embeds], dim = 0)
 				lstm_embeddings.append(typ_word_vec)
-			outputs = torch.stack(lstm_embeddings, dim = 0)
+			outputs = torch.stack(lstm_embeddings)
 		outputs = outputs.unsqueeze(0)
 		outputs = self.dropout(outputs)
 
@@ -101,7 +101,7 @@ class BERTEmbedding(nn.Module):
 		hidden_state = hidden_state.squeeze(0)
 		if self.typological:
 			bert_embeddings = []
-			typ_embeds = self.typ(lang = lang, typ_feature = typ_features, device = device)
+			typ_embeds = self.typ(lang = lang, typ_feature = typ_feature, device = device)
 			for i in range(len(hidden_state)):
 				word_vec = hidden_state[i]
 				typ_word_vec = torch.cat([word_vec, typ_embeds], dim = 1)
