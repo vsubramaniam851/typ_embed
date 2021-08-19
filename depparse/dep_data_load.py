@@ -13,7 +13,7 @@ import transformers
 tokenizer = transformers.BertTokenizer.from_pretrained('bert-base-uncased')
 
 #Reset base path to whatever directory has the data
-base_path = '/storage/vsub851/typ_embed/depparse/UD_English-EWT'
+# base_path = '/storage/vsub851/typ_embed/depparse/UD_English-EWT'
 
 def preproc_conllu(base_path, filename, save_csv = False):
 	'''Open the conllu file and filter out all comment lines in the conllu.

@@ -14,11 +14,11 @@ from dep_model import *
 from embedding_models import *
 from dep_data_load import *
 
-base_path = '/storage/vsub851/typ_embed/depparse'
-train_filename = 'en_ewt-ud-train.conllu'
-test_filename = 'en_ewt-ud-test.conllu'
+# base_path = '/storage/vsub851/typ_embed/depparse'
+# train_filename = 'en_ewt-ud-train.conllu'
+# test_filename = 'en_ewt-ud-test.conllu'
 
-seed = 0
+# seed = 0
 
 if cuda.is_available():
 	device = 'cuda'
@@ -45,8 +45,8 @@ def arc_eval(base_path,
 	scale = 0,
 	typological = False,
 	typ_embed_size = 32,
-	num_typ_features = 289,
-	typ_feature = 'syntax_knn+phonology_knn+inventory_knn',
+	num_typ_features = 103,
+	typ_feature = 'syntax_knn',
 	lang = 'en',
 	device = 'cpu'):
 	
@@ -59,12 +59,20 @@ def arc_eval(base_path,
 	classifier.load_state_dict(torch.load(model_loc))
 	
 	classifier = classifier.to(device)
+	classifier = classifier.double()
 	classifier.eval()
 
 	uas_total_examples = 0
 	uas_total_correct = 0
 	las_total_examples = 0
 	las_total_correct = 0
+
+	if typological:
+		typ_str = 'with'
+	else:
+		typ_str = 'without'
+
+	print('Evaluating {} model {} typological features'.format(modelname, typ_str))
 
 	for i in tqdm(range(0, len(test_corpus))):
 		sent_dict = test_corpus[i]
@@ -131,10 +139,10 @@ def test_eval(base_path,
 	bert = 'bert-base-uncased',
 	bert_layer = 7,
 	scale = 0,
-	typological = False,
+	typological = True,
 	typ_embed_size = 32,
-	num_typ_features = 289,
-	typ_feature = 'syntax_knn+phonology_knn+inventory_knn',
+	num_typ_features = 103,
+	typ_feature = 'syntax_knn',
 	lang = 'en',
 	device = 'cpu'):
 	
@@ -161,7 +169,7 @@ def test_eval(base_path,
 		test_corpus = bert_tokenizer(test_corpus)
 
 	print(arc_eval(base_path = base_path, test_corpus = test_corpus, eval_input = eval_input, num_words = num_words, num_pos = num_pos, num_labels = num_labels, modelname = modelname, word_embed_size = word_embed_size, pos_embed_size = pos_embed_size, encoder = encoder, lstm_hidden_size = lstm_hidden_size, dropout = dropout, 
-		lstm_layers = lstm_layers, bert = bert, bert_layer = bert_layer, scale = scale, typological = typological, typ_embed_size = typ_embed_size, typ_feature = typ_feature, lang = lang, device = device))
+		lstm_layers = lstm_layers, bert = bert, bert_layer = bert_layer, scale = scale, typological = typological, typ_embed_size = typ_embed_size, typ_feature = typ_feature, num_typ_features = num_typ_features, lang = lang, device = device))
 
-test_eval(base_path = base_path, train_filename = train_filename, test_filename = test_filename, eval_input = 'word_ids', modelname = 'dep2_bert.pt', dropout = 0.33, device = device,
-	encoder = 'bert')
+# test_eval(base_path = base_path, train_filename = train_filename, test_filename = test_filename, eval_input = 'lemma_ids', modelname = 'dep5_lstm_typ.pt', dropout = 0.33, device = device,
+# 	encoder = 'lstm')

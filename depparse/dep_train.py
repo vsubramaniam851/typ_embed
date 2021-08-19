@@ -30,11 +30,11 @@ else:
 	print('WARNING, this program is running on CPU')
 	device = 'cpu'
 
-base_path = '/storage/vsub851/typ_embed/depparse'
-train_filename = 'en_ewt-ud-train.conllu'
-valid_filename = 'en_ewt-ud-dev.conllu'
+# base_path = '/storage/vsub851/typ_embed/depparse'
+# train_filename = 'en_ewt-ud-train.conllu'
+# valid_filename = 'en_ewt-ud-dev.conllu'
 
-print('Using device: {}'.format(device)) #Ensure on GPU!
+# print('Using device: {}'.format(device)) #Ensure on GPU!
 
 lm_pretrained = transformers.BertModel.from_pretrained('bert-base-uncased').to(device)
 
@@ -250,11 +250,13 @@ def test_train(base_path,
 		train_corpus = bert_tokenizer(train_corpus)
 		valid_corpus = bert_tokenizer(valid_corpus)
 
+	# train_corpus = train_corpus[:int(0.75*len(train_corpus))]
+
 	print('Data loading complete')
 
 	arc_train(base_path = base_path, train_corpus = train_corpus, valid_corpus = valid_corpus, train_type = train_type ,num_words = len(vocab_dict), num_pos = len(pos_dict), num_labels = len(label_dict), modelname = modelname, word_embed_size = word_embed_size, 
 		pos_embed_size = pos_embed_size, encoder = encoder, lstm_hidden_size = lstm_hidden_size, lr = lr, dropout = dropout, num_epochs = num_epochs, lstm_layers = lstm_layers, batch_size = batch_size, bert = bert, bert_layer = bert_layer, scale = scale, 
 		typological = typological, typ_embed_size = typ_embed_size, num_typ_features = num_typ_features, typ_feature = typ_feature, lang = lang, device = device)
 
-test_train(base_path = base_path, train_filename = train_filename, valid_filename = valid_filename, modelname = 'dep1_lstm_typ.pt', train_type = 'lemma_ids', num_epochs = 10, 
-	encoder = 'lstm', dropout = 0.33, device = device)
+# test_train(base_path = base_path, train_filename = train_filename, valid_filename = valid_filename, modelname = 'dep5_lstm_typ.pt', train_type = 'lemma_ids', num_epochs = 10, 
+# 	encoder = 'lstm', dropout = 0.33, device = device)
