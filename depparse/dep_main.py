@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd 
 import random
 import argparse
+import unittest
 import lang2vec.lang2vec as l2v
 
 import torch
@@ -12,6 +13,7 @@ import torch.cuda as cuda
 from dep_train import *
 from dep_eval import *
 
+seed = 0
 if cuda.is_available():
 	device = 'cuda'
 	torch.cuda.manual_seed_all(seed)
@@ -38,10 +40,10 @@ def get_cmd_arguments():
 		help = 'Include typological features in training')
 	ap.add_argument('-tf', '--typfeatures', action = 'store', typ = str, dest = 'typ_feature', default = 'syntax_knn',
 		help = 'Which typological features to extract from the typological database')
-	ap.add_argument('nt', '--numtyp', action = 'store', typ = int, dest = 'num_typ_features', default = 103,
-		help = 'Number of typological features in the typological features extracted.')
 	ap.add_argument('-e', '--encoder', action = 'store', type = str, dest = 'encoder', default = 'lstm',
 		help = 'Word Embedding model, either BERT or LSTM')
+	ap.add_argument('-te', '--typencode', action = 'store', typ = str, dest = 'typ_encode', default = 'concat',
+		help = 'Method to use for incorporating typological features. Choose from [concat, add_att, mul_att] to decide to either use a concatentation or attention method')
 
 	#Model Hyperparameters
 	ap.add_argument('-wes', '--wordsize', action = 'store', dest = 'word_embed_size', type = int, default = 100, 
@@ -50,6 +52,8 @@ def get_cmd_arguments():
 		help = 'POS Embedding Size for model')
 	ap.add_argument('-lhs', '--lstmsize', action = 'store', dest = 'lstm_hidden_size', type = int, default = 400, 
 		help = 'LSTM Hidden size when using encoder LSTM')
+	ap.add_argument('-ahs', '--attentionsize', action = 'store', dest = 'attention_hidden_size', type = int, default = 200,
+		help = 'Multiplicative Attention Hidden Size')
 	ap.add_argument('-ll', '--lstmlayers', action = 'store', dest = 'lstm_layers', type = int, default = 3,
 		help = 'Number of LSTM Layers in LSTM encoder')
 	ap.add_argument('-d', '--dropout', action = 'store', dest = 'dropout', type = float, default = 0.33,
@@ -58,6 +62,8 @@ def get_cmd_arguments():
 		help = 'BERT Model to use when using BERT as encoder')
 	ap.add_argument('-tes', '--typsize', action = 'store', dest = 'typ_embed_size', type = int, default = 32,
 		help = 'Embedding size for typological embedding vector')
+	ap.add_argument('-nt', '--numtyp', action = 'store', typ = int, dest = 'num_typ_features', default = 103,
+		help = 'Number of typological features in the typological features extracted.')
 	ap.add_argument('-bl', '--bertlayer', action = 'store', dest = 'bert_layer', type = int, default = 8,
 		help = 'Layer to obtain BERT representations from')
 	ap.add_argument('-sc', '--scale', action = 'store', dest = 'scale', type = float, default = 0,
@@ -69,7 +75,87 @@ def get_cmd_arguments():
 
 	return ap.parse_args()
 
-def dep_main():
+def dep_main(train_filename,
+	valid_filename,
+	test_filename,
+	lang,
+	base_path,
+	train_model,
+	input_type,
+	word_embed_size,
+	pos_embed_size,
+	modelname,
+	encoder,
+	lstm_hidden_size,
+	lr,
+	dropout,
+	num_epochs,
+	lstm_layers,
+	batch_size,
+	bert,
+	bert_layer,
+	scale,
+	typological,
+	typ_embed_size,
+	num_typ_features,
+	typ_feature,
+	typ_encode,
+	attention_hidden_size,
+	device):
+	print('Starting Dependency Parsing')
+
+	print('Loading data in language {} from training file {}, validation file {}, and testing file {}'.format(lang, train_filename, valid_filename, test_filename))
+
+	file_path = os.path.join(base_path, directory)
+	train_lines = preproc_conllu(file_path, filename = train_filename)
+	train_sent_collection = sentence_collection(train_lines)
+	train_corpus, vocab_dict, label_dict, pos_dict = process_corpus(train_sent_collection, mode = 'train', input_type = input_type)
+
+	if train_model:
+		valid_lines = preproc_conllu(file_path, filename = valid_filename)
+		valid_sent_collection = sentence_collection(valid_lines)
+		valid_corpus, _, _, _ = process_corpus(valid_sent_collection, mode = 'valid', vocab_dict = vocab_dict, label_dict = label_dict,
+			pos_dict = pos_dict, input_type = args.input_type)
+
+		if encoder == 'bert':
+			train_corpus = bert_tokenizer(train_corpus)
+			valid_corpus = bert_tokenizer(valid_corpus)
+
+		print('Data Loading Complete')
+
+		if input_type == 'form':
+			input_type = 'word_ids'
+		else:
+			input_type = 'lemma_ids'
+
+		arc_train(base_path = base_path, train_corpus = train_corpus, valid_corpus = valid_corpus, train_type = input_type, num_words = len(vocab_dict), 
+			num_pos = len(pos_dict), num_labels = len(label_dict), modelname = modelname, word_embed_size = word_embed_size, pos_embed_size = pos_embed_size, encoder = encoder,
+			lstm_hidden_size = lstm_hidden_size, lr = lr, dropout = dropout, num_epochs = num_epochs, lstm_layers = lstm_layers, 
+			batch_size = batch_size, bert = bert, bert_layer = bert_layer, scale = scale, typological = typological, typ_embed_size = typ_embed_size,
+			num_typ_features = num_typ_features, typ_feature = typ_feature, typ_encode = typ_encode, attention_hidden_size = attention_hidden_size, lang = lang, device = device)
+	else:
+		test_lines = preproc_conllu(file_path, filename = test_filename)
+		test_sent_collection = sentence_collection(test_lines)
+		test_corpus, _, _, _ = process_corpus(test_sent_collection, mode = 'test', vocab_dict = vocab_dict, label_dict = label_dict,
+			pos_dict = pos_dict, input_type = args.input_type)
+
+		if encoder == 'bert':
+			test_corpus = bert_tokenizer(test_corpus)
+
+		print('Data Loading Complete')
+
+		if input_type == 'form':
+			input_type = 'word_ids'
+		else:
+			input_type = 'lemma_ids'
+
+		print(arc_eval(base_path = base_path, test_corpus = test_corpus, eval_input = input_type, num_words = len(vocab_dict), num_pos = len(pos_dict), 
+			num_labels = len(label_dict), modelname = modelname, word_embed_size = word_embed_size, pos_embed_size = pos_embed_size, encoder = encoder,
+			lstm_hidden_size = lstm_hidden_size, dropout = dropout, lstm_layers = lstm_layers, bert = bert, bert_layer = bert_layer,
+			scale = scale, typological = typological, typ_embed_size = typ_embed_size, typ_feature = typ_feature, num_typ_features = num_typ_features,
+			typ_encode = typ_encode, attention_hidden_size = attention_hidden_size, lang = lang, device = device))
+
+if __name__ == '__main__':
 	args = get_cmd_argument()
 
 	seed = 0
@@ -83,56 +169,37 @@ def dep_main():
 		valid_filename = 'en_ewt-ud-dev.conllu'
 		test_filename = 'en_ewt-ud-test.conllu'
 
-	#Testing for right encoder type
-	if args.encoder not in ['bert', 'lstm']:
-		raise NameError('Please choose an encoder in either BERT or LSTM')
-	if args.input_type not in ['lemma', 'form']:
-		raise NameError('Please choose an input type of form or lemma')
+	debug = unittest.TestCase()
 
-	print('Loading data in language {} from training file {}, validation file {}, and testing file {}'.format(args.lang, train_filename, valid_filename, test_filename))
+	assert(args.encoder in ['bert', 'lstm']), 'Please choose either BERT or LSTM to build word embeddings'
+	assert(args.input_type in ['lemma', 'form']), 'Please choose an input type of form or lemma'
+	assert(args.typ_encode in ['concat', 'add_att', 'mul_att']), 'Please use attention or concatention for encoding typological features'
 
-	file_path = os.path.join(args.base_path, directory)
-	train_lines = preproc_conllu(file_path, filename = train_filename)
-	train_sent_collection = sentence_collection(train_lines)
-	train_corpus, vocab_dict, label_dict, pos_dict = process_corpus(train_sent_collection, mode = 'train', input_type = args.input_type)
-
-	if args.train_model:
-		valid_lines = preproc_conllu(file_path, filename = valid_filename)
-		valid_sent_collection = sentence_collection(valid_lines)
-		valid_corpus, _, _, _ = process_corpus(valid_sent_collection, mode = 'valid', vocab_dict = vocab_dict, label_dict = label_dict,
-			pos_dict = pos_dict, input_type = args.input_type)
-
-		if args.encoder == 'bert':
-			train_corpus = bert_tokenizer(train_corpus)
-			valid_corpus = bert_tokenizer(valid_corpus)
-
-		print('Data Loading Complete')
-
-		if args.input_type == 'form':
-			input_type = 'word_ids'
-		else:
-			input_type = 'lemma_ids'
-
-		arc_train(base_path = args.base_path, train_corpus = train_corpus, valid_corpus = valid_corpus, train_type = input_type, num_words = len(vocab_dict), 
-			num_pos = len(pos_dict), num_labels = len(label_dict), modelname = modelname, word_embed_size = args.word_embed_size, encoder = args.encoder,
-			lstm_hidden_size = args.lstm_hidden_size, lr = args.lr, dropout = args.dropout, num_epochs = args.num_epochs, lstm_layers = args.lstm_layers, 
-			batch_size = 1, bert = args.bert, bert_layer = args.bert_layer, scale = args.scale, typological = args.typological, typ_embed_size = args.typ_embed_size,
-			num_typ_features = args.num_typ_features, typ_feature = args.typ_feature, lang = lang, device = device)
-	else:
-		test_lines = preproc_conllu(file_path, filename = test_filename)
-		test_sent_collection = sentence_collection(test_lines)
-		test_corpus, _, _, _ = process_corpus(test_sent_collection, mode = 'test', vocab_dict = vocab_dict, label_dict = label_dict,
-			pos_dict = pos_dict, input_type = args.input_type)
-
-		print('Data Loading Complete')
-
-		if args.input_type == 'form':
-			input_type = 'word_ids'
-		else:
-			input_type = 'lemma_ids'
-
-		print(arc_eval(base_path = args.base_path, test_corpus = test_corpus, eval_input = input_type, num_words = len(vocab_dict), num_pos = len(pos_dict), 
-			num_labels = len(label_dict), modelname = args.modelname, word_embed_size = args.word_embed_size, pos_embed_size = pos_embed_size, encoder = args.encoder,
-			lstm_hidden_size = args.lstm_hidden_size, dropout = args.dropout, lstm_layers = args.lstm_layers, bert = args.bert, bert_layer = args.bert_layer,
-			scale = args.scale, typological = args.typological, typ_embed_size = args.typ_embed_size, typ_feature = args.typ_feature, num_typ_features = args.num_typ_features,
-			lang = args.lang, device = device))
+	debug.assertTrue(os.path.exists(args.base_path), msg = 'Base path does not exist')	
+	dep_main(train_filename = train_filename,
+		valid_filename = valid_filename,
+		test_filename = test_filename,
+		lang = args.lang,
+		base_path = args.base_path,
+		train_model = args.train_model,
+		input_type = args.input_type,
+		word_embed_size = args.word_embed_size,
+		pos_embed_size = args.pos_embed_size,
+		modelname = args.modelname,
+		encoder = args.encoder,
+		lstm_hidden_size = args.lstm_hidden_size,
+		lr = args.lr,
+		dropout = args.dropout,
+		num_epochs = args.num_epochs,
+		lstm_layers = args.lstm_layers,
+		batch_size = 1,
+		bert = args.bert,
+		bert_layer = args.bert_layer,
+		scale = args.scale,
+		typological = args.typological,
+		typ_embed_size = args.typ_embed_size,
+		num_typ_features = args.num_typ_features,
+		typ_feature = args.typ_feature,
+		typ_encode = args.typ_encode,
+		attention_hidden_size = args.attention_hidden_size,
+		device = device)

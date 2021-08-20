@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import os
+import numpy as np 
 import torch
 import torch.nn as nn
 import transformers
@@ -24,6 +25,43 @@ class TypologicalLanguageEmbed(nn.Module):
 
 		return x
 
+class Attention(nn.Module):
+	def __init__(self, d1, d2, d3):
+		super(Attention, self).__init__()
+		self.d1 = d1
+		self.d2 = d2
+		self.d3 = d3
+
+	def forward(self, typ_embed, word_embed):
+		e_scores = self._get_weights(typ_embed, word_embed)
+		a_scores = nn.functional.softmax(e_scores, dim = 0)
+		return torch.mul(word_embed.T, a_scores).T
+
+class AdditiveAttention(Attention):
+	def __init__(self, d1, d2, d3 = 200):
+		assert(d3 is not None), 'Enter a numerical d3 for Additive Attention'
+		super().__init__(d1, d2, d3)
+
+		self.W_3 = nn.Parameter(torch.FloatTensor(self.d3).uniform_(-0.1, 0.1))
+		self.W_1 = nn.Linear(self.d2, self.d3)
+		self.W_2 = nn.Linear(self.d1, self.d3)
+
+	def _get_weights(self, typ_embed, word_embed):
+		typ_embed = typ_embed.repeat(word_embed.size(0), 1)
+		weights = self.W_1(word_embed) + self.W_2(typ_embed)
+		return torch.tanh(weights)@self.W_3
+
+class MultiplicativeAttention(Attention):
+	def __init__(self, d1, d2, d3 = None):
+		assert(d3 is None), 'Multiplicative only requires one dimension'
+		super().__init__(d1, d2, d3)
+
+		self.W = nn.Parameter(torch.FloatTensor(self.d1, self.d2).uniform_(-0.1, 0.1))
+
+	def _get_weights(self, typ_embed, word_embed):
+		weights = (typ_embed@self.W@word_embed.T).squeeze(0)
+		return weights/np.sqrt(weights.size(0))
+
 class LSTMEmbedding(nn.Module):
 	def __init__(self, 
 		num_words, 
@@ -35,7 +73,9 @@ class LSTMEmbedding(nn.Module):
 		typological = True, 
 		typ_embed_size = 32, 
 		dropout = 0.33, 
-		num_typ_features = 289):
+		num_typ_features = 289,
+		typ_encode = 'concat',
+		attention_hidden_size = 200):
 
 		super(LSTMEmbedding, self).__init__()
 		self.word_embed = nn.Embedding(num_embeddings = num_words, embedding_dim = word_embed_size)
@@ -44,9 +84,14 @@ class LSTMEmbedding(nn.Module):
 		self.dropout = nn.Dropout(dropout)
 		if typological:
 			self.typ = TypologicalLanguageEmbed(num_typ_features = num_typ_features, typ_embed_size = typ_embed_size, hidden_size = num_typ_features, dropout = dropout)
+			if typ_encode == 'add_att':
+				self.attention = AdditiveAttention(d1 = typ_embed_size, d2 = lstm_hidden_size * 2, d3 = attention_hidden_size)
+			elif typ_encode == 'mul_att':
+				self.attention = MultiplicativeAttention(d1 = num_typ_features, d2 = lstm_hidden_size*2)
 		else:
 			self.typ = None
 		self.typological = typological
+		self.typ_encode = typ_encode
 
 	def forward(self, words, pos_tags, lang = 'en', typ_feature = 'syntax_knn+phonology_knn+inventory_knn', device = 'cpu'):
 		word_embeddings = self.word_embed(words)
@@ -55,17 +100,17 @@ class LSTMEmbedding(nn.Module):
 		pos_embeddings = self.dropout(pos_embeddings)
 		embeddings = torch.cat([word_embeddings, pos_embeddings], dim = 2)
 		outputs, _ = self.lstm(embeddings)
-		outputs = outputs.squeeze(0)
 
 		if self.typological:
-			lstm_embeddings = []
-			typ_embeds = self.typ(lang = lang, typ_feature = typ_feature, device = device)
-			for i in range(len(outputs)):
-				word_vec = outputs[i]
-				typ_word_vec = torch.cat([word_vec, typ_embeds], dim = 0)
-				lstm_embeddings.append(typ_word_vec)
-			outputs = torch.stack(lstm_embeddings)
-		outputs = outputs.unsqueeze(0)
+			typ_embed = self.typ(lang = lang, typ_feature = typ_feature, device = device)
+			if self.typ_encode == 'concat':
+				typ_embed = typ_embed.repeat(outputs.size(1), 1).unsqueeze(0)
+				outputs = torch.cat([outputs, typ_embed], dim = 2)
+			elif self.typ_encode == 'add_att' or self.typ_encode == 'mul_att':
+				outputs = outputs.squeeze(0)
+				outputs = self.attention.forward(typ_embed = typ_embed, word_embed = outputs)
+				outputs.unsqueeze(0)
+
 		outputs = self.dropout(outputs)
 
 		return outputs
@@ -79,18 +124,27 @@ class BERTEmbedding(nn.Module):
 		typ_embed_size = 32, 
 		num_typ_features = 289, 
 		bert_layer = 4, 
-		dropout = 0.25):
+		dropout = 0.25,
+		typ_encode = 'concat',
+		attention_hidden_size = 200):
 
 		super(BERTEmbedding, self).__init__()
 		self.lm = transformers.BertModel.from_pretrained(bert)
+
 		if typological:
 			self.typ = TypologicalLanguageEmbed(num_typ_features = num_typ_features, typ_embed_size = typ_embed_size, hidden_size = num_typ_features, dropout = dropout)
+			if typ_encode == 'add_att':
+				self.attention = AdditiveAttention(d1 = typ_embed_size, d2 = 768, d3 = attention_hidden_size)
+			elif typ_encode == 'mul_att':
+				self.attention = MultiplicativeAttention(d1 = typ_embed_size, d2 = 768)
 		else: 
 			self.typ = None
+
 		self.dropout = nn.Dropout(dropout)
 
 		self.typological = typological 
 		self.bert_layer = bert_layer 
+		self.typ_encode = typ_encode
 
 	def forward(self, input_ids, attention_mask, lang = 'en', typ_feature = 'syntax_knn+phonology_knn+inventory_knn', device = 'cpu'):
 		lm_output = self.lm(input_ids = input_ids, attention_mask = attention_mask, output_hidden_states = True)
@@ -98,16 +152,16 @@ class BERTEmbedding(nn.Module):
 		hidden_state = lm_output.hidden_states[self.bert_layer]
 		hidden_state = hidden_state[:, 1:-1, :]
 
-		hidden_state = hidden_state.squeeze(0)
 		if self.typological:
-			bert_embeddings = []
-			typ_embeds = self.typ(lang = lang, typ_feature = typ_feature, device = device)
-			for i in range(len(hidden_state)):
-				word_vec = hidden_state[i]
-				typ_word_vec = torch.cat([word_vec, typ_embeds], dim = 1)
-				bert_embeddings.append(typ_word_vec)
-			hidden_state = torch.stack(bert_embeddings)
-		hidden_state = hidden_state.unsqueeze(0)
+			typ_embed = self.typ(lang = lang, typ_feature = typ_feature, device = device)
+			if self.typ_encode == 'concat':
+				typ_embed = typ_embed.repeat(hidden_state.size(1), 1).unsqueeze(0)
+				outputs = torch.cat([hidden_state, typ_embed], dim = 2)
+			elif self.typ_encode == 'add_att' or self.typ_encode == 'mul_att':
+				hidden_state = hidden_state.squeeze(0)
+				outputs = self.attention.forward(typ_embed = typ_embed, word_embed = hidden_state)
+				outputs = torch.unsqueeze(0)
+
 		outputs = self.dropout(hidden_state)
 
 		return outputs

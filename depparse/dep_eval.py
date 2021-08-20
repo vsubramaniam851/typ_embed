@@ -22,7 +22,7 @@ from dep_data_load import *
 
 if cuda.is_available():
 	device = 'cuda'
-	torch.cuda.manual_seed_all(seed)
+	# torch.cuda.manual_seed_all(seed)
 else:
 	print('WARNING, this program is running on CPU')
 	device = 'cpu'
@@ -47,13 +47,16 @@ def arc_eval(base_path,
 	typ_embed_size = 32,
 	num_typ_features = 103,
 	typ_feature = 'syntax_knn',
+	typ_encode = 'concat',
+	attention_hidden_size = 200,
 	lang = 'en',
 	device = 'cpu'):
 	
 	pad_index = num_words
 	classifier = BiaffineDependencyModel(n_words = num_words, n_pos = num_pos, n_rels = num_labels, word_embed_size = word_embed_size, pos_embed_size = pos_embed_size,  
 		encoder = encoder, lstm_hidden_size = lstm_hidden_size, lstm_layers = lstm_layers, bert = bert, bert_pad_index = 0, dropout = dropout, n_bert_layer = bert_layer, 
-		n_arc_mlp = 500, n_rel_mlp = 100, scale = scale, pad_index = pad_index, unk_index = 0, typological = typological, typ_embed_size = typ_embed_size, num_typ_features = num_typ_features)
+		n_arc_mlp = 500, n_rel_mlp = 100, scale = scale, pad_index = pad_index, unk_index = 0, typological = typological, typ_embed_size = typ_embed_size, 
+		num_typ_features = num_typ_features, typ_encode = typ_encode, attention_hidden_size = 200)
 
 	model_loc = os.path.join(base_path, 'saved_models', modelname)
 	classifier.load_state_dict(torch.load(model_loc))
@@ -143,6 +146,8 @@ def test_eval(base_path,
 	typ_embed_size = 32,
 	num_typ_features = 103,
 	typ_feature = 'syntax_knn',
+	typ_encode = 'concat',
+	attention_hidden_size = 200,
 	lang = 'en',
 	device = 'cpu'):
 	
@@ -169,7 +174,7 @@ def test_eval(base_path,
 		test_corpus = bert_tokenizer(test_corpus)
 
 	print(arc_eval(base_path = base_path, test_corpus = test_corpus, eval_input = eval_input, num_words = num_words, num_pos = num_pos, num_labels = num_labels, modelname = modelname, word_embed_size = word_embed_size, pos_embed_size = pos_embed_size, encoder = encoder, lstm_hidden_size = lstm_hidden_size, dropout = dropout, 
-		lstm_layers = lstm_layers, bert = bert, bert_layer = bert_layer, scale = scale, typological = typological, typ_embed_size = typ_embed_size, typ_feature = typ_feature, num_typ_features = num_typ_features, lang = lang, device = device))
+		lstm_layers = lstm_layers, bert = bert, bert_layer = bert_layer, scale = scale, typological = typological, typ_embed_size = typ_embed_size, typ_feature = typ_feature, num_typ_features = num_typ_features, typ_encode = typ_encode, attention_hidden_size = attention_hidden_size, lang = lang, device = device))
 
 # test_eval(base_path = base_path, train_filename = train_filename, test_filename = test_filename, eval_input = 'lemma_ids', modelname = 'dep5_lstm_typ.pt', dropout = 0.33, device = device,
 # 	encoder = 'lstm')

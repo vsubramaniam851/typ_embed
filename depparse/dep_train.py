@@ -62,6 +62,8 @@ def arc_train(base_path,
 	typ_embed_size = 32,
 	num_typ_features = 289,
 	typ_feature = 'syntax_knn+phonology_knn+inventory_knn',
+	typ_encode = 'concat',
+	attention_hidden_size = 200,
 	lang = 'en',
 	device = 'cpu'):
 	'''Train the model. Specify the model type and hyperparameters. The LSTM model takes in lemmas in a sentence and predicts its heads and dependencies
@@ -73,7 +75,8 @@ def arc_train(base_path,
 	classifier = BiaffineDependencyModel(n_words = num_words, n_pos = num_pos, n_rels = num_labels, word_embed_size = word_embed_size, pos_embed_size = pos_embed_size, lstm_hidden_size = lstm_hidden_size, encoder = encoder, lstm_layers = lstm_layers, 
 		bert = bert, bert_pad_index = 0, dropout = dropout, n_bert_layer = bert_layer, 
 		n_arc_mlp = 500, n_rel_mlp = 100, scale = scale, pad_index = pad_index, 
-		unk_index = 0, typological = typological, typ_embed_size = typ_embed_size, num_typ_features = num_typ_features)
+		unk_index = 0, typological = typological, typ_embed_size = typ_embed_size, num_typ_features = num_typ_features, 
+		typ_encode = typ_encode, attention_hidden_size = attention_hidden_size)
 
 	optimizer = optim.Adam(classifier.parameters(), lr = lr)
 
@@ -225,6 +228,8 @@ def test_train(base_path,
 	typ_embed_size = 32,
 	num_typ_features = 103,
 	typ_feature= 'syntax_knn',
+	typ_encode = 'concat',
+	attention_hidden_size = 200,
 	lang = 'en',
 	device = 'cpu'):
 	
@@ -256,7 +261,7 @@ def test_train(base_path,
 
 	arc_train(base_path = base_path, train_corpus = train_corpus, valid_corpus = valid_corpus, train_type = train_type ,num_words = len(vocab_dict), num_pos = len(pos_dict), num_labels = len(label_dict), modelname = modelname, word_embed_size = word_embed_size, 
 		pos_embed_size = pos_embed_size, encoder = encoder, lstm_hidden_size = lstm_hidden_size, lr = lr, dropout = dropout, num_epochs = num_epochs, lstm_layers = lstm_layers, batch_size = batch_size, bert = bert, bert_layer = bert_layer, scale = scale, 
-		typological = typological, typ_embed_size = typ_embed_size, num_typ_features = num_typ_features, typ_feature = typ_feature, lang = lang, device = device)
+		typological = typological, typ_embed_size = typ_embed_size, num_typ_features = num_typ_features, typ_feature = typ_feature, typ_encode = typ_encode, attention_hidden_size = attention_hidden_size, lang = lang, device = device)
 
 # test_train(base_path = base_path, train_filename = train_filename, valid_filename = valid_filename, modelname = 'dep5_lstm_typ.pt', train_type = 'lemma_ids', num_epochs = 10, 
 # 	encoder = 'lstm', dropout = 0.33, device = device)
