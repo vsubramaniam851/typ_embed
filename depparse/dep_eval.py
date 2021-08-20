@@ -15,6 +15,7 @@ from embedding_models import *
 from dep_data_load import *
 
 # base_path = '/storage/vsub851/typ_embed/depparse'
+# data_path = '/storage/vsub851/typ_embed/datasets'
 # train_filename = 'en_ewt-ud-train.conllu'
 # test_filename = 'en_ewt-ud-test.conllu'
 
@@ -129,6 +130,7 @@ def arc_eval(base_path,
 	return 'UAS Score {}, LAS Score {}'.format(uas_total_correct/uas_total_examples, las_total_correct/las_total_examples)
 
 def test_eval(base_path,
+	data_path,
 	train_filename,
 	test_filename,
 	eval_input,
@@ -151,7 +153,7 @@ def test_eval(base_path,
 	lang = 'en',
 	device = 'cpu'):
 	
-	file_path = os.path.join(base_path, 'UD_English-EWT')
+	file_path = os.path.join(data_path, 'UD_English-EWT')
 	print('Loading data from training file {} and testing file {}'.format(train_filename, test_filename))
 	train_lines = preproc_conllu(file_path, filename = train_filename)
 	train_sent_collection = sentence_collection(train_lines)

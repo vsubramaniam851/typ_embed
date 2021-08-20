@@ -31,6 +31,7 @@ else:
 	device = 'cpu'
 
 # base_path = '/storage/vsub851/typ_embed/depparse'
+# data_path = '/storage/vsub851/typ_embed/datasets'
 # train_filename = 'en_ewt-ud-train.conllu'
 # valid_filename = 'en_ewt-ud-dev.conllu'
 
@@ -208,6 +209,7 @@ def arc_train(base_path,
 	torch.save(classifier.state_dict(), save_path)
 
 def test_train(base_path, 
+	data_path,
 	train_filename, 
 	valid_filename,
 	modelname, 
@@ -236,7 +238,7 @@ def test_train(base_path,
 	#Load data
 	print('Loading data from training file {} and validation file {}'.format(train_filename, valid_filename))
 
-	file_path = os.path.join(base_path, 'UD_English-EWT')
+	file_path = os.path.join(data_path, 'UD_English-EWT')
 	train_lines = preproc_conllu(file_path, filename = train_filename)
 	train_sent_collection = sentence_collection(train_lines)
 	if train_type == 'lemma_ids':
@@ -263,5 +265,5 @@ def test_train(base_path,
 		pos_embed_size = pos_embed_size, encoder = encoder, lstm_hidden_size = lstm_hidden_size, lr = lr, dropout = dropout, num_epochs = num_epochs, lstm_layers = lstm_layers, batch_size = batch_size, bert = bert, bert_layer = bert_layer, scale = scale, 
 		typological = typological, typ_embed_size = typ_embed_size, num_typ_features = num_typ_features, typ_feature = typ_feature, typ_encode = typ_encode, attention_hidden_size = attention_hidden_size, lang = lang, device = device)
 
-# test_train(base_path = base_path, train_filename = train_filename, valid_filename = valid_filename, modelname = 'dep5_lstm_typ.pt', train_type = 'lemma_ids', num_epochs = 10, 
+# test_train(base_path = base_path, data_path = data_path, train_filename = train_filename, valid_filename = valid_filename, modelname = 'dep5_lstm_typ.pt', train_type = 'lemma_ids', num_epochs = 10, 
 # 	encoder = 'lstm', dropout = 0.33, device = device)

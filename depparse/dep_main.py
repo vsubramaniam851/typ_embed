@@ -28,6 +28,7 @@ def get_cmd_arguments():
 
 	ap.add_argument('-p', '--path', action = 'store', type = str, dest = 'base_path', default = '/storage/vsub851/typ_embed/depparse',
 		help = 'Base path to all Dependency Parsing models and data')
+	ap.add_argument('-d', '--data', action = 'store', type = str, dest = 'data_path', default = '/storage/vsub851/typ_embed/datasets')
 	ap.add_argument('-t', '--train', action = 'store', type = bool, dest = 'train_model', default = False,
 		help = 'Train a new model, saved in saved_models directory in depparse directory')
 	ap.add_argument('-m', '--model', action = 'store', type = str, dest = 'modelname', default = 'dep_model.pt', 
@@ -80,6 +81,7 @@ def dep_main(train_filename,
 	test_filename,
 	lang,
 	base_path,
+	data_path,
 	train_model,
 	input_type,
 	word_embed_size,
@@ -170,17 +172,19 @@ if __name__ == '__main__':
 		test_filename = 'en_ewt-ud-test.conllu'
 
 	debug = unittest.TestCase()
+	debug.assertTrue(os.path.exists(args.base_path), msg = 'Base path does not exist')	
+	debug.assertTrue(os.path.exists(args.data_path), msg = 'Data path does not exist')
 
 	assert(args.encoder in ['bert', 'lstm']), 'Please choose either BERT or LSTM to build word embeddings'
 	assert(args.input_type in ['lemma', 'form']), 'Please choose an input type of form or lemma'
 	assert(args.typ_encode in ['concat', 'add_att', 'mul_att']), 'Please use attention or concatention for encoding typological features'
 
-	debug.assertTrue(os.path.exists(args.base_path), msg = 'Base path does not exist')	
 	dep_main(train_filename = train_filename,
 		valid_filename = valid_filename,
 		test_filename = test_filename,
 		lang = args.lang,
 		base_path = args.base_path,
+		data_path = args.data_path,
 		train_model = args.train_model,
 		input_type = args.input_type,
 		word_embed_size = args.word_embed_size,
