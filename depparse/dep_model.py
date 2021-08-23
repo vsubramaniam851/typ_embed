@@ -40,16 +40,16 @@ class BiaffineDependencyModel(nn.Module):
 		self.pad_index = pad_index 
 		if encoder == 'lstm':
 			self.encode = LSTMEmbedding(num_words = n_words, num_pos = n_pos, lstm_layers = lstm_layers, word_embed_size = word_embed_size, pos_embed_size = pos_embed_size, 
-				lstm_hidden_size = lstm_hidden_size, dropout = dropout, typological = typological, typ_embed_size = typ_embed_size, num_typ_features = num_typ_features, typ_encode = 'concat',
-				attention_hidden_size = 200)
+				lstm_hidden_size = lstm_hidden_size, dropout = dropout, typological = typological, typ_embed_size = typ_embed_size, num_typ_features = num_typ_features, typ_encode = typ_encode,
+				attention_hidden_size = attention_hidden_size)
 			n_embed = lstm_hidden_size * 2
 		elif encoder == 'bert':
 			self.encode = BERTEmbedding(bert = bert, typological = typological, bert_pad_index = bert_pad_index, bert_hidden_size = 768, typ_embed_size = typ_embed_size, 
-				num_typ_features = num_typ_features, bert_layer = n_bert_layer, typ_encode = 'concat', attention_hidden_size = 200)
+				num_typ_features = num_typ_features, bert_layer = n_bert_layer, typ_encode = typ_encode, attention_hidden_size = attention_hidden_size)
 			n_embed = 768
 		else:
 			n_embed = 0
-			raise NameError('Please choose either LSTM or BERT Embedding')
+			raise AssertionError('Please choose either LSTM or BERT Embedding')
 		if typological and typ_encode == 'concat':
 			n_embed = n_embed + typ_embed_size
 
@@ -69,7 +69,7 @@ class BiaffineDependencyModel(nn.Module):
 			x = self.encode(words = words, pos_tags = pos_tags, lang = lang, typ_feature = typ_feature, device = device)
 		else:
 			x = self.encode(input_ids = input_ids, attention_mask = attention_mask, lang = lang, typ_feature = typ_feature, device = device)
-		assert(x.size(2) == n_embed), 'Check if size of encoding is correct'
+		assert(x.size(2) == self.n_embed), 'Check if size of encoding is correct'
 
 		mask = words.ne(self.pad_index) if len(words.shape) < 3 else words.ne(self.pad_index).any(-1)
 

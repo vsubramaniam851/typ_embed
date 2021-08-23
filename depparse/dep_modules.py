@@ -9,7 +9,7 @@ class MLP(nn.Module):
 	def __init__(self, n_in, n_out, dropout = 0.33, activation = True):
 		super(MLP, self).__init__()
 
-		self.linear1 = nn.Linear(n_in, n_out)
+		self.linear = nn.Linear(n_in, n_out)
 		# self.linear2 = nn.Linear(200, n_out)
 		self.activation = nn.LeakyReLU(negative_slope = 0.1) if activation else nn.Identity()
 		self.dropout = nn.Dropout(dropout)

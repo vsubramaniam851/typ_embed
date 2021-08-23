@@ -111,7 +111,7 @@ def process_corpus(corpus, mode = None, vocab_dict = None, label_dict = None, in
 		#Create sentence from joining the words since we may use a language model to get input ids which needs the sentence
 		sentence = ' '.join(words)
 		#Add a dictionary for each sentence in the corpus. This will represent our data corpus for all sentences
-		sent_parses.append({'sent': words, 'word_ids': word_ids, 'lemma_ids': lemma_ids, 'joined': sentence, 'pos_ids': pos_ids})
+		sent_parses.append({'sent': words, 'word_ids': word_ids, 'lemma_ids': lemma_ids, 'joined': sentence, 'pos_tags': pos_ids})
 	return sent_parses, vocab_dict, label_dict
 
 def bert_tokenizer(sent_parses):

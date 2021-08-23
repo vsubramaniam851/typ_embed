@@ -79,7 +79,8 @@ class LSTMEmbedding(nn.Module):
 
 		super(LSTMEmbedding, self).__init__()
 		self.word_embed = nn.Embedding(num_embeddings = num_words, embedding_dim = word_embed_size)
-		self.pos_embed = nn.Embedding(num_embeddings = num_pos, embedding_dim = pos_embed_size)
+		if num_pos != 0:
+			self.pos_embed = nn.Embedding(num_embeddings = num_pos, embedding_dim = pos_embed_size)
 		self.lstm = nn.LSTM(word_embed_size+pos_embed_size, lstm_hidden_size, num_layers = lstm_layers, dropout = dropout, batch_first = True, bidirectional = True)
 		self.dropout = nn.Dropout(dropout)
 		if typological:
@@ -95,10 +96,13 @@ class LSTMEmbedding(nn.Module):
 
 	def forward(self, words, pos_tags, lang = 'en', typ_feature = 'syntax_knn+phonology_knn+inventory_knn', device = 'cpu'):
 		word_embeddings = self.word_embed(words)
-		pos_embeddings = self.pos_embed(pos_tags)
 		word_embeddings = self.dropout(word_embeddings)
-		pos_embeddings = self.dropout(pos_embeddings)
-		embeddings = torch.cat([word_embeddings, pos_embeddings], dim = 2)
+		if pos_tags is not None:
+			pos_embeddings = self.pos_embed(pos_tags)
+			pos_embeddings = self.dropout(pos_embeddings)
+			embeddings = torch.cat([word_embeddings, pos_embeddings], dim = 2)
+		else:
+			embeddings = word_embeddings
 		outputs, _ = self.lstm(embeddings)
 
 		if self.typological:
