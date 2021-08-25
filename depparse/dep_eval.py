@@ -1,6 +1,6 @@
 import os
 import sys
-sys.path.insert(1, '/storage/vsub851/typ_embed')
+sys.path.insert(1, '../')
 import numpy as np 
 import pandas as pd
 from tqdm import tqdm

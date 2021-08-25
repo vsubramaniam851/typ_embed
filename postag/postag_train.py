@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import sys
+sys.path.insert(1, '../')
 import os
 import random
 import numpy as np 
@@ -27,12 +28,12 @@ else:
 	print('WARNING, this program is running on CPU')
 	device = 'cpu'
 
-lm_pretrained = transformers.BertModel.from_pretrained('bert-base-uncased').to(device)
+# lm_pretrained = transformers.BertModel.from_pretrained('bert-base-uncased').to(device)
 
-base_path = '/storage/vsub851/typ_embed/postag'
-data_path = '/storage/vsub851/typ_embed/datasets'
-train_filename = 'en_ewt-ud-train.conllu'
-valid_filename = 'en_ewt-ud-dev.conllu'
+# base_path = '/storage/vsub851/typ_embed/postag'
+# data_path = '/storage/vsub851/typ_embed/datasets'
+# train_filename = 'en_ewt-ud-train.conllu'
+# valid_filename = 'en_ewt-ud-dev.conllu'
 
 def pos_train(base_path,
 	train_corpus,

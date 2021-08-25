@@ -21,9 +21,7 @@ else:
 	print('WARNING, this program is running on CPU')
 	device = 'cpu'
 
-print('Using device: {}'.format(device)) #Ensure on GPU!
-
-def get_cmd_arguments():
+def get_cmd_arguments_dep():
 	ap = argparse.ArgumentParser()
 
 	ap.add_argument('-p', '--path', action = 'store', type = str, dest = 'base_path', default = '/storage/vsub851/typ_embed/depparse',
@@ -83,6 +81,7 @@ def dep_main(train_filename,
 	lang,
 	base_path,
 	data_path,
+	data_directory,
 	train_model,
 	input_type,
 	word_embed_size,
@@ -109,7 +108,7 @@ def dep_main(train_filename,
 
 	print('Loading data in language {} from training file {}, validation file {}, and testing file {}'.format(lang, train_filename, valid_filename, test_filename))
 
-	file_path = os.path.join(data_path, directory)
+	file_path = os.path.join(data_path, data_directory)
 	train_lines = preproc_conllu(file_path, filename = train_filename)
 	train_sent_collection = sentence_collection(train_lines)
 	train_corpus, vocab_dict, label_dict, pos_dict = process_corpus(train_sent_collection, mode = 'train', input_type = input_type)
@@ -159,7 +158,9 @@ def dep_main(train_filename,
 			typ_encode = typ_encode, attention_hidden_size = attention_hidden_size, lang = lang, device = device))
 
 if __name__ == '__main__':
-	args = get_cmd_argument()
+	print('Using device: {}'.format(device)) #Ensure on GPU!
+
+	args = get_cmd_argument_dep()
 
 	seed = 0
 	random.seed(seed)
@@ -171,6 +172,12 @@ if __name__ == '__main__':
 		train_filename = 'en_ewt-ud-train.conllu'
 		valid_filename = 'en_ewt-ud-dev.conllu'
 		test_filename = 'en_ewt-ud-test.conllu'
+	else:
+		directory = None
+		train_filename = None
+		valid_filename = None
+		test_filename = None
+		raise AssertionError('Please enter a valid language')
 
 	debug = unittest.TestCase()
 	debug.assertTrue(os.path.exists(args.base_path), msg = 'Base path does not exist')	
@@ -186,6 +193,7 @@ if __name__ == '__main__':
 		lang = args.lang,
 		base_path = args.base_path,
 		data_path = args.data_path,
+		data_directory = directory,
 		train_model = args.train_model,
 		input_type = args.input_type,
 		word_embed_size = args.word_embed_size,

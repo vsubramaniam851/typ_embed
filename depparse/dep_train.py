@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import sys
-sys.path.insert(1, '/storage/vsub851/typ_embed')
+sys.path.insert(1, '../')
 import os
 import random
 import numpy as np 

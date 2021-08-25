@@ -6,7 +6,7 @@ import torch.nn as nn
 import torch.functional as F 
 
 from dep_modules import *
-sys.path.insert(1, '/storage/vsub851/typ_embed')
+sys.path.insert(1, '../')
 from embedding_models import *
 
 class BiaffineDependencyModel(nn.Module):
