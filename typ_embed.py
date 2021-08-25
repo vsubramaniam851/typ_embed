@@ -9,7 +9,7 @@ import torch.cuda as cuda
 sys.path.insert(1, './depparse')
 sys.path.insert(1, './postag')
 from depparse.dep_main import *
-from postag.pos_main import *
+from postag.postag_main import *
 
 eed = 0
 if cuda.is_available():
@@ -23,16 +23,16 @@ print('Using device: {}'.format(device)) #Ensure on GPU!
 
 def get_cmd_arguments():
 	ap = argparse.ArgumentParser()
-	subparsers = parser.add_subparsers(dest = 'task_name')
+	subparsers = ap.add_subparsers(dest = 'task_name')
 	subparsers.required = True
 	dep_parser = subparsers.add_parser('dep')
 	pos_parser = subparsers.add_parser('pos')
 
 	#DEPENDENCY PARSER ARGUMENTS
 
-	dep_parser.add_argument('-p', '--path', action = 'store', type = str, dest = 'base_path', default = '/storage/vsub851/typ_embed/depparse',
+	dep_parser.add_argument('-p', '--path', action = 'store', type = str, dest = 'base_path', default = './depparse',
 		help = 'Base path to all Dependency Parsing models and data')
-	dep_parser.add_argument('-d', '--data', action = 'store', type = str, dest = 'data_path', default = '/storage/vsub851/typ_embed/datasets', 
+	dep_parser.add_argument('-d', '--data', action = 'store', type = str, dest = 'data_path', default = './datasets', 
 		help = 'Dataset location')
 	dep_parser.add_argument('-t', '--train', action = 'store', type = bool, dest = 'train_model', default = False,
 		help = 'Train a new model, saved in saved_models directory in depparse directory')
@@ -62,7 +62,7 @@ def get_cmd_arguments():
 		help = 'Multiplicative Attention Hidden Size')
 	dep_parser.add_argument('-ll', '--lstmlayers', action = 'store', dest = 'lstm_layers', type = int, default = 3,
 		help = 'Number of LSTM Layers in LSTM encoder')
-	dep_parser.add_argument('-d', '--dropout', action = 'store', dest = 'dropout', type = float, default = 0.33,
+	dep_parser.add_argument('-dr', '--dropout', action = 'store', dest = 'dropout', type = float, default = 0.33,
 		help = 'Dropout probability to be used in all components of model')
 	dep_parser.add_argument('-b', '--bert', action = 'store', dest = 'bert', type = str, default = 'bert-base-uncased',
 		help = 'BERT Model to use when using BERT as encoder')
@@ -81,9 +81,9 @@ def get_cmd_arguments():
 
 	#POS Tagger Arguments
 
-	pos_parser.add_argument('-p', '--path', action = 'store', type = str, dest = 'base_path', default = '/storage/vsub851/typ_embed/depparse',
+	pos_parser.add_argument('-p', '--path', action = 'store', type = str, dest = 'base_path', default = './postag',
 		help = 'Base path to all Dependency Parsing models and data')
-	pos_parser.add_argument('-d', '--data', action = 'store', type = str, dest = 'data_path', default = '/storage/vsub851/typ_embed/datasets', 
+	pos_parser.add_argument('-d', '--data', action = 'store', type = str, dest = 'data_path', default = './datasets', 
 		help = 'Dataset location')
 	pos_parser.add_argument('-t', '--train', action = 'store', type = bool, dest = 'train_model', default = False,
 		help = 'Train a new model, saved in saved_models directory in postag directory')
@@ -113,7 +113,7 @@ def get_cmd_arguments():
 		help = 'Multiplicative Attention Hidden Size')
 	pos_parser.add_argument('-ll', '--lstmlayers', action = 'store', dest = 'lstm_layers', type = int, default = 3,
 		help = 'Number of LSTM Layers in LSTM encoder')
-	pos_parser.add_argument('-d', '--dropout', action = 'store', dest = 'dropout', type = float, default = 0.33,
+	pos_parser.add_argument('-dr', '--dropout', action = 'store', dest = 'dropout', type = float, default = 0.33,
 		help = 'Dropout probability to be used in all components of model')
 	pos_parser.add_argument('-b', '--bert', action = 'store', dest = 'bert', type = str, default = 'bert-base-uncased',
 		help = 'BERT Model to use when using BERT as encoder')

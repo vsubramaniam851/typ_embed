@@ -10,8 +10,8 @@ import lang2vec.lang2vec as l2v
 import torch
 import torch.cuda as cuda
 
-from dep_train import *
-from dep_eval import *
+from postag_train import *
+from postag_eval import *
 
 seed = 0
 if cuda.is_available():
@@ -21,6 +21,7 @@ else:
 	print('WARNING, this program is running on CPU')
 	device = 'cpu'
 
+# print('Using device: {}'.format(device)) #Ensure on GPU!
 
 def get_cmd_arguments_pos():
 	ap = argparse.ArgumentParser()
@@ -31,7 +32,7 @@ def get_cmd_arguments_pos():
 		help = 'Dataset location')
 	ap.add_argument('-t', '--train', action = 'store', type = bool, dest = 'train_model', default = False,
 		help = 'Train a new model, saved in saved_models directory in postag directory')
-	ap.add_argument('-m', '--model', action = 'store', type = str, dest = 'modelname', default = 'dep_model.pt', 
+	ap.add_argument('-m', '--model', action = 'store', type = str, dest = 'modelname', default = 'pos_lstm1_model.pt', 
 		help = 'Name of saved model that is either being trained or being evaluated. Most be stored in saved_models directory')
 	ap.add_argument('-l', '--lang', action = 'store', type = str, dest = 'lang', default = 'en',
 		help = 'Language to run dependency parsing model on')
@@ -57,7 +58,7 @@ def get_cmd_arguments_pos():
 		help = 'Multiplicative Attention Hidden Size')
 	ap.add_argument('-ll', '--lstmlayers', action = 'store', dest = 'lstm_layers', type = int, default = 3,
 		help = 'Number of LSTM Layers in LSTM encoder')
-	ap.add_argument('-d', '--dropout', action = 'store', dest = 'dropout', type = float, default = 0.33,
+	ap.add_argument('-dr', '--dropout', action = 'store', dest = 'dropout', type = float, default = 0.33,
 		help = 'Dropout probability to be used in all components of model')
 	ap.add_argument('-b', '--bert', action = 'store', dest = 'bert', type = str, default = 'bert-base-uncased',
 		help = 'BERT Model to use when using BERT as encoder')
@@ -158,7 +159,7 @@ def pos_main(train_filename,
 if __name__ == '__main__':
 	print('Using device: {}'.format(device)) #Ensure on GPU!
 
-	args = get_cmd_argument_pos()
+	args = get_cmd_arguments_pos()
 
 	seed = 0
 	random.seed(seed)

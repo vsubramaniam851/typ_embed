@@ -178,5 +178,5 @@ def test_eval(base_path,
 	print(arc_eval(base_path = base_path, test_corpus = test_corpus, eval_input = eval_input, num_words = num_words, num_pos = num_pos, num_labels = num_labels, modelname = modelname, word_embed_size = word_embed_size, pos_embed_size = pos_embed_size, encoder = encoder, lstm_hidden_size = lstm_hidden_size, dropout = dropout, 
 		lstm_layers = lstm_layers, bert = bert, bert_layer = bert_layer, scale = scale, typological = typological, typ_embed_size = typ_embed_size, typ_feature = typ_feature, num_typ_features = num_typ_features, typ_encode = typ_encode, attention_hidden_size = attention_hidden_size, lang = lang, device = device))
 
-# test_eval(base_path = base_path, train_filename = train_filename, test_filename = test_filename, eval_input = 'lemma_ids', modelname = 'dep5_lstm_typ.pt', dropout = 0.33, device = device,
+# test_eval(base_path = base_path, data_path = data_path, train_filename = train_filename, test_filename = test_filename, eval_input = 'lemma_ids', modelname = 'dep5_lstm_typ.pt', dropout = 0.33, device = device,
 # 	encoder = 'lstm')

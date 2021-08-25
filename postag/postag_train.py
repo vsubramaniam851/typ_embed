@@ -11,8 +11,8 @@ from torch import cuda
 import torch.nn as nn
 import torch.optim as optim 
 
-from dep_model import *
-from dep_data_load import *
+from postag_model import *
+from postag_data_load import *
 
 import transformers
 
@@ -30,10 +30,10 @@ else:
 
 # lm_pretrained = transformers.BertModel.from_pretrained('bert-base-uncased').to(device)
 
-# base_path = '/storage/vsub851/typ_embed/postag'
-# data_path = '/storage/vsub851/typ_embed/datasets'
-# train_filename = 'en_ewt-ud-train.conllu'
-# valid_filename = 'en_ewt-ud-dev.conllu'
+base_path = '/storage/vsub851/typ_embed/postag'
+data_path = '/storage/vsub851/typ_embed/datasets'
+train_filename = 'en_ewt-ud-train.conllu'
+valid_filename = 'en_ewt-ud-dev.conllu'
 
 def pos_train(base_path,
 	train_corpus,
@@ -63,7 +63,7 @@ def pos_train(base_path,
 	device = 'cpu'):
 
 	classifier = POSTaggingModel(n_words = num_words, n_tags = num_labels, word_embed_size = word_embed_size, lstm_hidden_size = lstm_hidden_size, encoder = encoder, lstm_layers = lstm_layers,
-		bert = bert, bert_pad_index = bert_pad_index, dropout = dropout, n_bert_layer = n_bert_layer, mlp_hidden_size = mlp_hidden_size, typological = typological, typ_embed_size = typ_embed_size, num_typ_features = num_typ_features, 
+		bert = bert, dropout = dropout, n_bert_layer = bert_layer, mlp_hidden_size = mlp_hidden_size, typological = typological, typ_embed_size = typ_embed_size, num_typ_features = num_typ_features, 
 		typ_encode = typ_encode, attention_hidden_size = attention_hidden_size)
 
 	optimizer = optim.Adam(classifier.parameters(), lr = lr)
@@ -92,7 +92,7 @@ def pos_train(base_path,
 					word_batch.append(torch.tensor(sent[train_type]).long().to(device))
 					pos_tags.append(torch.tensor(sent['pos_tags']).long().to(device))
 				word_batch = torch.stack(word_batch).to(device)
-				pos_tags = torch.stack(word_batch).to(device)
+				pos_tags = torch.stack(pos_tags).to(device)
 
 				pos_tags = pos_tags.squeeze(0)
 
@@ -117,7 +117,7 @@ def pos_train(base_path,
 			loss.backward()
 			optimizer.step()
 			optimizer.zero_grad()
-			total_loss = total_loss + item()
+			total_loss = total_loss + loss.item()
 
 		print('Epoch {}, train loss={}'.format(epoch, total_loss / len(train_corpus)))
 		total_loss = 0
@@ -134,7 +134,7 @@ def pos_train(base_path,
 					word_batch.append(torch.tensor(sent[train_type]).long().to(device))
 					pos_tags.append(torch.tensor(sent['pos_tags']).long().to(device))
 				word_batch = torch.stack(word_batch).to(device)
-				pos_tags = torch.stack(word_batch).to(device)
+				pos_tags = torch.stack(pos_tags).to(device)
 
 				pos_tags = pos_tags.squeeze(0)
 
@@ -155,8 +155,8 @@ def pos_train(base_path,
 
 				pos_preds = classifier.forward(input_ids = input_ids, attention_mask = attention_mask, lang = lang, typ_feature = typ_feature, device = device)
 
-			loss = classiifer.loss(pred_tags = pos_preds, tags = pos_tags)
-			total_loss = loss.item()
+			loss = classifier.loss(pred_tags = pos_preds, tags = pos_tags)
+			total_loss = total_loss + loss.item()
 		print('Epoch {}, valid loss = {}'.format(epoch, total_loss / len(valid_corpus)))
 	print('TRAINING IS FINISHED')
 
@@ -217,4 +217,4 @@ def test_train(base_path,
 		num_epochs = num_epochs, lstm_layers = lstm_layers, batch_size = batch_size, bert = bert, bert_layer = bert_layer, typological = typological, typ_embed_size = typ_embed_size,
 		num_typ_features = num_typ_features, typ_feature = typ_feature, typ_encode = typ_encode, attention_hidden_size = attention_hidden_size, lang = lang, device = device)
 
-# test_train(base_path = base_path, train_filename = train_filename, valid_filename = valid_filename, train_type = 'lemma_ids', modelname = 'pos1_lstm.pt', device = device)
+# test_train(base_path = base_path, data_path = data_path, train_filename = train_filename, valid_filename = valid_filename, train_type = 'lemma_ids', modelname = 'pos1_lstm.pt', device = device)

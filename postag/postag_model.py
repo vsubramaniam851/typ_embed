@@ -64,7 +64,7 @@ class POSTaggingModel(nn.Module):
 
 		output = output.squeeze(0)
 
-		assert(len(x.shape) == 2), 'Check that size of encoding is not 3 and has been squeezed'
+		assert(len(output.shape) == 2), 'Check that size of encoding is not 3 and has been squeezed'
 
 		return output
 
