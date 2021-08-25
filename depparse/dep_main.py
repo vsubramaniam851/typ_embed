@@ -38,11 +38,11 @@ def get_cmd_arguments_dep():
 		help = 'Type of input to run through LSTM, either form or lemma')
 	ap.add_argument('-ty', '--typological', action = 'store', type = bool, dest = 'typological', default = False,
 		help = 'Include typological features in training')
-	ap.add_argument('-tf', '--typfeatures', action = 'store', typ = str, dest = 'typ_feature', default = 'syntax_knn',
+	ap.add_argument('-tf', '--typfeatures', action = 'store', type = str, dest = 'typ_feature', default = 'syntax_knn',
 		help = 'Which typological features to extract from the typological database')
 	ap.add_argument('-e', '--encoder', action = 'store', type = str, dest = 'encoder', default = 'lstm',
 		help = 'Word Embedding model, either BERT or LSTM')
-	ap.add_argument('-te', '--typencode', action = 'store', typ = str, dest = 'typ_encode', default = 'concat',
+	ap.add_argument('-te', '--typencode', action = 'store', type = str, dest = 'typ_encode', default = 'concat',
 		help = 'Method to use for incorporating typological features. Choose from [concat, add_att, mul_att] to decide to either use a concatentation or attention method')
 
 	#Model Hyperparameters
@@ -56,13 +56,13 @@ def get_cmd_arguments_dep():
 		help = 'Multiplicative Attention Hidden Size')
 	ap.add_argument('-ll', '--lstmlayers', action = 'store', dest = 'lstm_layers', type = int, default = 3,
 		help = 'Number of LSTM Layers in LSTM encoder')
-	ap.add_argument('-d', '--dropout', action = 'store', dest = 'dropout', type = float, default = 0.33,
+	ap.add_argument('-dr', '--dropout', action = 'store', dest = 'dropout', type = float, default = 0.33,
 		help = 'Dropout probability to be used in all components of model')
 	ap.add_argument('-b', '--bert', action = 'store', dest = 'bert', type = str, default = 'bert-base-uncased',
 		help = 'BERT Model to use when using BERT as encoder')
 	ap.add_argument('-tes', '--typsize', action = 'store', dest = 'typ_embed_size', type = int, default = 32,
 		help = 'Embedding size for typological embedding vector')
-	ap.add_argument('-nt', '--numtyp', action = 'store', typ = int, dest = 'num_typ_features', default = 103,
+	ap.add_argument('-nt', '--numtyp', action = 'store', type = int, dest = 'num_typ_features', default = 103,
 		help = 'Number of typological features in the typological features extracted.')
 	ap.add_argument('-bl', '--bertlayer', action = 'store', dest = 'bert_layer', type = int, default = 8,
 		help = 'Layer to obtain BERT representations from')
@@ -160,7 +160,7 @@ def dep_main(train_filename,
 if __name__ == '__main__':
 	print('Using device: {}'.format(device)) #Ensure on GPU!
 
-	args = get_cmd_argument_dep()
+	args = get_cmd_arguments_dep()
 
 	seed = 0
 	random.seed(seed)

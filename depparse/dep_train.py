@@ -37,7 +37,7 @@ else:
 
 # print('Using device: {}'.format(device)) #Ensure on GPU!
 
-lm_pretrained = transformers.BertModel.from_pretrained('bert-base-uncased').to(device)
+# lm_pretrained = transformers.BertModel.from_pretrained('bert-base-uncased').to(device)
 
 def arc_train(base_path,
 	train_corpus,
@@ -266,4 +266,4 @@ def test_train(base_path,
 		typological = typological, typ_embed_size = typ_embed_size, num_typ_features = num_typ_features, typ_feature = typ_feature, typ_encode = typ_encode, attention_hidden_size = attention_hidden_size, lang = lang, device = device)
 
 # test_train(base_path = base_path, data_path = data_path, train_filename = train_filename, valid_filename = valid_filename, modelname = 'dep5_lstm_typ.pt', train_type = 'lemma_ids', num_epochs = 10, 
-# 	encoder = 'lstm', dropout = 0.33, device = device)
+# 	encoder = 'lstm', typ_encode = 'mul_att', dropout = 0.33, device = device)

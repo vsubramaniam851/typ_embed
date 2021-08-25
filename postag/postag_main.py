@@ -39,11 +39,11 @@ def get_cmd_arguments_pos():
 		help = 'Type of input to run through LSTM, either form or lemma')
 	ap.add_argument('-ty', '--typological', action = 'store', type = bool, dest = 'typological', default = False,
 		help = 'Include typological features in training')
-	ap.add_argument('-tf', '--typfeatures', action = 'store', typ = str, dest = 'typ_feature', default = 'syntax_knn',
+	ap.add_argument('-tf', '--typfeatures', action = 'store', type = str, dest = 'typ_feature', default = 'syntax_knn',
 		help = 'Which typological features to extract from the typological database')
 	ap.add_argument('-e', '--encoder', action = 'store', type = str, dest = 'encoder', default = 'lstm',
 		help = 'Word Embedding model, either BERT or LSTM')
-	ap.add_argument('-te', '--typencode', action = 'store', typ = str, dest = 'typ_encode', default = 'concat',
+	ap.add_argument('-te', '--typencode', action = 'store', type = str, dest = 'typ_encode', default = 'concat',
 		help = 'Method to use for incorporating typological features. Choose from /[concat, add_att, mul_att]/ to decide to either use a concatentation or attention method')
 
 	#Model Hyperparameters
@@ -63,7 +63,7 @@ def get_cmd_arguments_pos():
 		help = 'BERT Model to use when using BERT as encoder')
 	ap.add_argument('-tes', '--typsize', action = 'store', dest = 'typ_embed_size', type = int, default = 32,
 		help = 'Embedding size for typological embedding vector')
-	ap.add_argument('-nt', '--numtyp', action = 'store', typ = int, dest = 'num_typ_features', default = 103,
+	ap.add_argument('-nt', '--numtyp', action = 'store', type = int, dest = 'num_typ_features', default = 103,
 		help = 'Number of typological features in the typological features extracted.')
 	ap.add_argument('-bl', '--bertlayer', action = 'store', dest = 'bert_layer', type = int, default = 8,
 		help = 'Layer to obtain BERT representations from')

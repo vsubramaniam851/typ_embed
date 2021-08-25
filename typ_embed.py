@@ -44,11 +44,11 @@ def get_cmd_arguments():
 		help = 'Type of input to run through LSTM, either form or lemma')
 	dep_parser.add_argument('-ty', '--typological', action = 'store', type = bool, dest = 'typological', default = False,
 		help = 'Include typological features in training')
-	dep_parser.add_argument('-tf', '--typfeatures', action = 'store', typ = str, dest = 'typ_feature', default = 'syntax_knn',
+	dep_parser.add_argument('-tf', '--typfeatures', action = 'store', type = str, dest = 'typ_feature', default = 'syntax_knn',
 		help = 'Which typological features to extract from the typological database')
 	dep_parser.add_argument('-e', '--encoder', action = 'store', type = str, dest = 'encoder', default = 'lstm',
 		help = 'Word Embedding model, either BERT or LSTM')
-	dep_parser.add_argument('-te', '--typencode', action = 'store', typ = str, dest = 'typ_encode', default = 'concat',
+	dep_parser.add_argument('-te', '--typencode', action = 'store', type = str, dest = 'typ_encode', default = 'concat',
 		help = 'Method to use for incorporating typological features. Choose from [concat, add_att, mul_att] to decide to either use a concatentation or attention method')
 
 	# Dependency Parsing Model Hyperparameters
@@ -68,7 +68,7 @@ def get_cmd_arguments():
 		help = 'BERT Model to use when using BERT as encoder')
 	dep_parser.add_argument('-tes', '--typsize', action = 'store', dest = 'typ_embed_size', type = int, default = 32,
 		help = 'Embedding size for typological embedding vector')
-	dep_parser.add_argument('-nt', '--numtyp', action = 'store', typ = int, dest = 'num_typ_features', default = 103,
+	dep_parser.add_argument('-nt', '--numtyp', action = 'store', type = int, dest = 'num_typ_features', default = 103,
 		help = 'Number of typological features in the typological features extracted.')
 	dep_parser.add_argument('-bl', '--bertlayer', action = 'store', dest = 'bert_layer', type = int, default = 8,
 		help = 'Layer to obtain BERT representations from')
@@ -95,11 +95,11 @@ def get_cmd_arguments():
 		help = 'Type of input to run through LSTM, either form or lemma')
 	pos_parser.add_argument('-ty', '--typological', action = 'store', type = bool, dest = 'typological', default = False,
 		help = 'Include typological features in training')
-	pos_parser.add_argument('-tf', '--typfeatures', action = 'store', typ = str, dest = 'typ_feature', default = 'syntax_knn',
+	pos_parser.add_argument('-tf', '--typfeatures', action = 'store', type = str, dest = 'typ_feature', default = 'syntax_knn',
 		help = 'Which typological features to extract from the typological database')
 	pos_parser.add_argument('-e', '--encoder', action = 'store', type = str, dest = 'encoder', default = 'lstm',
 		help = 'Word Embedding model, either BERT or LSTM')
-	pos_parser.add_argument('-te', '--typencode', action = 'store', typ = str, dest = 'typ_encode', default = 'concat',
+	pos_parser.add_argument('-te', '--typencode', action = 'store', type = str, dest = 'typ_encode', default = 'concat',
 		help = 'Method to use for incorporating typological features. Choose from /[concat, add_att, mul_att]/ to decide to either use a concatentation or attention method')
 
 	#POS Tagging Model Hyperparameters
@@ -119,7 +119,7 @@ def get_cmd_arguments():
 		help = 'BERT Model to use when using BERT as encoder')
 	pos_parser.add_argument('-tes', '--typsize', action = 'store', dest = 'typ_embed_size', type = int, default = 32,
 		help = 'Embedding size for typological embedding vector')
-	pos_parser.add_argument('-nt', '--numtyp', action = 'store', typ = int, dest = 'num_typ_features', default = 103,
+	pos_parser.add_argument('-nt', '--numtyp', action = 'store', type = int, dest = 'num_typ_features', default = 103,
 		help = 'Number of typological features in the typological features extracted.')
 	pos_parser.add_argument('-bl', '--bertlayer', action = 'store', dest = 'bert_layer', type = int, default = 8,
 		help = 'Layer to obtain BERT representations from')
@@ -138,6 +138,10 @@ def main():
 	debug = unittest.TestCase()
 	debug.assertTrue(os.path.exists(args.base_path), msg = 'Base path does not exist')	
 	debug.assertTrue(os.path.exists(args.data_path), msg = 'Data path does not exist')
+
+	assert(args.encoder in ['bert', 'lstm']), 'Please choose either BERT or LSTM to build word embeddings'
+	assert(args.input_type in ['lemma', 'form']), 'Please choose an input type of form or lemma'
+	assert(args.typ_encode in ['concat', 'add_att', 'mul_att']), 'Please use attention or concatention for encoding typological features'
 
 	if args.task_name == 'dep':
 		seed = 0

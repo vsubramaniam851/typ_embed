@@ -88,7 +88,7 @@ class LSTMEmbedding(nn.Module):
 			if typ_encode == 'add_att':
 				self.attention = AdditiveAttention(d1 = typ_embed_size, d2 = lstm_hidden_size * 2, d3 = attention_hidden_size)
 			elif typ_encode == 'mul_att':
-				self.attention = MultiplicativeAttention(d1 = num_typ_features, d2 = lstm_hidden_size*2)
+				self.attention = MultiplicativeAttention(d1 = typ_embed_size, d2 = lstm_hidden_size*2)
 		else:
 			self.typ = None
 		self.typological = typological
@@ -113,7 +113,7 @@ class LSTMEmbedding(nn.Module):
 			elif self.typ_encode == 'add_att' or self.typ_encode == 'mul_att':
 				outputs = outputs.squeeze(0)
 				outputs = self.attention.forward(typ_embed = typ_embed, word_embed = outputs)
-				outputs.unsqueeze(0)
+				outputs = outputs.unsqueeze(dim = 0)
 
 		outputs = self.dropout(outputs)
 
@@ -164,7 +164,7 @@ class BERTEmbedding(nn.Module):
 			elif self.typ_encode == 'add_att' or self.typ_encode == 'mul_att':
 				hidden_state = hidden_state.squeeze(0)
 				outputs = self.attention.forward(typ_embed = typ_embed, word_embed = hidden_state)
-				outputs = torch.unsqueeze(0)
+				outputs = outputs.unsqueeze(0)
 
 		outputs = self.dropout(hidden_state)
 
