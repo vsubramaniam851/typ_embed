@@ -11,9 +11,13 @@ This repository contains the code for incorporating typological feature informat
 
 ## Install
 It is recommended to install a Python virtual environment either using `venv` or through Anaconda to obtain all package dependencies. Once installed, clone the repository either using 
-`git clone https://github.com/vsubramaniam851/typ_embed.git`
+```
+git clone https://github.com/vsubramaniam851/typ_embed.git
+```
 or
-`git clone git@github.com:vsubramaniam851/typ_embed.git`
+```
+git clone git@github.com:vsubramaniam851/typ_embed.git
+```
 
 ## Run
 Run using typ_embed.py file on command line. To specify which task to run, subparsers are used so use `dep` for Dependency Parsing and `pos` for POS tagging after the `python` call. For example to train a new Dependency Parsing model dep_model.pt with typological embeddings incorporated using additive attention, use the following function call,
