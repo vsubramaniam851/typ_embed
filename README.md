@@ -28,7 +28,7 @@ To evaluate the model `dep_model.pt` after it has completed training,
 ```
 python typ_embed.py dep -m dep_model.pt -ty True -te add_att 
 ```
-All modifiable parameters are described in the typ_embed.py file. These include incorporating typological features (`-ty True`), the size of the typological embedding (`-tes 32`), and what method to use for incorporating typological embeddings into word embeddings (attention: `-te add_att`, `-te mul_att`, or concatentation: `-te concat`). Every data loading, train, and eval files have test functions to ensure all main functions in the file are working that can be run.
+All modifiable parameters are described in the typ_embed.py file. These include incorporating typological features (`-ty True`), the size of the typological embedding (`-tes 32`), and what method to use for incorporating typological embeddings into word embeddings (attention: `-te add_att`, `-te mul_att`, or concatentation: `-te concat`). Every data loading, train, and eval files have test functions to ensure all main functions in the file are working that can be run separately for the sake of debugging.
 
 
 ## Citations
