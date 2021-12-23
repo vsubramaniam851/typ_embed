@@ -1,188 +1,122 @@
+# -*- coding: utf-8 -*-
+
 import sys
 import os
 import numpy as np 
 import csv
+from conll_df import conll_df
+from types import SimpleNamespace
+import pandas as pd
 
 import torch
-import torch.nn as nn
-import torch.functional as F 
+from torch.utils import data
 
-import transformers
+class LoadConllu(object):
+	def __init__(self, data_path, filename, mode = 'train', vocab_dict = None, pos_dict = None, label_dict = None, input_type = 'lemma'):
+		file_path = os.path.join(data_path, filename)
+		word_df = conll_df(file_path, file_index = False, skip_morph = True)
+		self.sent_parses, self.vocab_dict, self.label_dict, self.pos_dict = self.process_corpus(word_df, mode = mode, input_type = input_type, vocab_dict = vocab_dict, pos_dict = pos_dict, label_dict = label_dict)
 
-#Use BERT tokenizer for tokenizing sentences
-tokenizer = transformers.BertTokenizer.from_pretrained('bert-base-uncased')
-
-#Reset base path to whatever directory has the data
-# base_path = '/storage/vsub851/typ_embed/datasets/UD_English-EWT'
-
-def preproc_conllu(base_path, filename, save_csv = False):
-	'''Open the conllu file and filter out all comment lines in the conllu.
-	If save_csv = True, write the filtered lines to new conllu in data_conllu'''
-	file_path = os.path.join(base_path, filename)
-	f = open(file_path, 'r')
-	lines = []
-	for line in f.readlines():
-		if line[0] != '#':
-			#Strip all new lines from the file
-			line = line.strip('\n') 
-			#CoNLL-U files are tab delimited
-			lines.append(line.split('\t')) 
-	print('Finished processing Conllu {}'.format(filename))
-	#Save to new CoNLL-U without comment lines so that we only have the text
-	if save_csv:
-		print('Saving to new Conllu')
-		save_path = os.path.join(base_path, 'data_conllu', filename)
-		with open(save_path, mode = 'w') as write_conllu:
-			writer = csv.writer(write_conllu, delimiter = '\t')
-
-			for l in lines:
-				writer.writerow(l)
-	return lines
-
-def sentence_collection(lines):
-	'''Collect the lines of the files into sentence collections for input to the tokenizer'''
-	sentences = []
-	new_sent = []
-	for l in lines:
-		#CoNLL-U lines describe a word and the first entry in the file describes the index of that word in the sentence. If the first entry is 1, 
-		# this indicates a new sentence
-		if l[0] == '1':
-			sentences.append(new_sent)
-			if [] in sentences:
-				#Remove any empty lines that indicate a break between sentences
-				sentences.remove([])
-			new_sent = [l]
-		else:
-			if l != ['']:
-				new_sent.append(l)
-	return sentences 
-
-def process_corpus(corpus, mode = None, vocab_dict = None, label_dict = None, pos_dict = None, input_type = 'form'):
-	'''Take in the sentences which are in conllu format and collect the words, lemmas, heads, and dependencies.
-	The word is the first index and will be used for the tokenizer and language model pipeline. The lemmas will be used 
-	for the LSTM sentence encoding.
-	'''
-	if not vocab_dict:
-		#Initialize vocab dict if we are training the model
-		vocab_dict = {'UNK': 0, 'ROOT': 1}
-	if not pos_dict:
-		pos_dict = {'UNK': 0, 'ROOT': 1}
-	if not label_dict:
-		label_dict = {'UNK': 0, 'NO-REL': 1}
-	sent_parses = []
-	for sent in corpus:
-		deprel_ids = [label_dict['NO-REL']]
-		lemma_ids = [vocab_dict['ROOT']]
-		word_ids = [vocab_dict['ROOT']]
-		pos_ids = [pos_dict['ROOT']]
-		heads = [0]
-		words = ['ROOT']
-		length = len(sent)
-		for word in sent:
-			#Skip all blank lines
-			if len(word) <= 1:
+	def process_corpus(self, word_df, mode = 'train', input_type = 'form', vocab_dict = None, pos_dict = None, label_dict = None):
+		if not vocab_dict:
+			vocab_dict = {'UNK': 0, 'ROOT': 1}
+		if not pos_dict:
+			pos_dict = {'UNK': 0, 'ROOT': 1}
+		if not label_dict:
+			label_dict = {'UNK': 0, 'NO-REL': 1}
+		sent_parses = []
+		prev_s = None
+		for s, i in word_df.index:
+			if prev_s == s:
 				continue
-			form = word[1]
-			words.append(word[1])
-			lemma = word[2]
-			head = word[6]
-			deprel = word[7]
-			pos = word[4]
-			if head == '_':
-				#If a head is _ that means it is blank or unknown. Just append the length of the sentence for this instance
-				head = str(length)
-			heads.append(int(head))
-			if input_type == 'lemma':
-				if lemma in vocab_dict:
-					lemma_ids.append(vocab_dict[lemma])
+			prev_s = s
+			deprels = ['NO-REL'] + word_df.loc[s, 'f'].tolist()
+			lemmas = ['ROOT'] + word_df.loc[s, 'l'].tolist()
+			pos = ['ROOT'] + word_df.loc[s, 'x'].tolist()
+			heads = [0] + word_df.loc[s, 'g'].tolist()
+			words = ['ROOT'] + word_df.loc[s, 'w'].tolist()
+			lemma_ids, word_ids, pos_ids, deprel_ids = [vocab_dict['ROOT']], [vocab_dict['ROOT']], [pos_dict['ROOT']], [label_dict['NO-REL']]
+
+			for w, l, p, d in zip(words[1:], lemmas[1:], pos[1:], deprels[1:]):
+				if input_type == 'lemma':
+					if l in vocab_dict:
+						lemma_ids.append(vocab_dict[l])
+					elif mode == 'train':
+						lemma_ids.append(len(vocab_dict))
+						vocab_dict[l] = len(vocab_dict)
+					else:
+						lemma_ids.append(vocab_dict['UNK'])
+
+				elif input_type == 'form':
+					if w in vocab_dict:
+						word_ids.append(vocab_dict[w])
+					elif mode == 'train':
+						word_ids.append(len(vocab_dict))
+						vocab_dict[w] = len(vocab_dict)
+					else:
+						word_ids.append(vocab_dict['UNK'])
+
+				if d in label_dict:
+					deprel_ids.append(label_dict[d])
 				elif mode == 'train':
-					#Create corpus if we are going to train a new model:
-					lemma_ids.append(len(vocab_dict))
-					vocab_dict[lemma] = len(vocab_dict)
+					deprel_ids.append(len(label_dict))
+					label_dict[d] = len(label_dict)
 				else:
-					#If we are processing the test corpus, any word that is not in the corpus is marked as UNK
-					lemma_ids.append(vocab_dict['UNK'])
-			elif input_type == 'form':
-				if form in vocab_dict:
-					word_ids.append(vocab_dict[form])
+					deprel_ids.append(label_dict['UNK'])
+
+				if p in pos_dict:
+					pos_ids.append(pos_dict[p])
 				elif mode == 'train':
-					word_ids.append(len(vocab_dict))
-					vocab_dict[form] = len(vocab_dict)
+					pos_ids.append(len(pos_dict))
+					pos_dict[p] = len(pos_dict)
 				else:
-					#If we are processing the test corpus, any word that is not in the corpus is marked as UNK
-					word_ids.append(vocab_dict['UNK'])
-			if deprel in label_dict:
-				deprel_ids.append(label_dict[deprel])
-			elif mode == 'train':
-				deprel_ids.append(len(label_dict))
-				label_dict[deprel] = len(label_dict)
+					pos_ids.append(pos_dict['UNK'])
+
+			sentence = ' '.join(words)
+
+			assert(len(words) == (len(word_ids) if len(word_ids) > len(lemma_ids) else len(lemma_ids)) == len(deprel_ids) == len(heads)), 'Sizes are not the same'
+			if len(word_ids) > len(lemma_ids):
+				input_data = word_ids
 			else:
-				deprel_ids.append(label_dict['UNK'])
-			if pos in pos_dict:
-				pos_ids.append(pos_dict[pos])
-			elif mode == 'train':
-				pos_ids.append(len(pos_dict))
-				pos_dict[pos] = len(pos_dict)
-			else:
-				pos_ids.append(pos_dict['UNK'])
-		#Create sentence from joining the words since we may use a language model to get input ids which needs the sentence
-		sentence = ' '.join(words)
-		#Add a dictionary for each sentence in the corpus. This will represent our data corpus for all sentences
-		sent_parses.append({'sent': words, 'word_ids': word_ids, 'lemma_ids': lemma_ids, 'deprel_ids': deprel_ids, 'heads': heads, 'joined': sentence, 'pos_ids': pos_ids})
-	return sent_parses, vocab_dict, label_dict, pos_dict 
+				input_data = lemma_ids
 
-def num_heads(sent_parses):
-	'''Find the longest sentence since this is the number of labels for when we predict heads'''
-	max_length = 0
-	for i in range(len(sent_parses)):
-		if len(sent_parses[i]['heads']) > max_length:
-			max_length = len(sent_parses[i]['heads'])
-	return max_length
+			sent_parse = {'sent': words, 'input_data': input_data, 'deprel_ids': deprel_ids, 'heads': heads, 'pos_ids': pos_ids}
+			sent_parses.append(pd.DataFrame.from_dict(sent_parse))
+		return pd.concat(sent_parses, keys = [i for i in range(len(sent_parses))]), vocab_dict, label_dict, pos_dict
 
-def lemma_padding(sent_parses, vocab_dict):
-	'''Pad lemmas in case we want to change the batch size'''
-	num_words = len(vocab_dict)
-	for i in range(len(sent_parses)):
-		#Add num word to pad the ID
-		sent_parses[i]['lemma_ids'].append(num_words)
-	return sent_parses 
+class DepData(data.Dataset):
+	def __init__(self, dep_df):
+		self.dep_df = dep_df 
+	def __len__(self):
+		return len(self.dep_df.index.levels[0])
+	def __getitem__(self, idx):
+		return {
+			'words': self.dep_df.loc[idx, 'sent'].tolist(),
+			'input_data': torch.tensor(self.dep_df.loc[idx, 'input_data'].tolist()),
+			'pos_ids': torch.tensor(self.dep_df.loc[idx, 'pos_ids'].tolist()),
+			'deprel_ids': torch.tensor(self.dep_df.loc[idx, 'deprel_ids'].tolist()).squeeze(),
+			'heads': torch.tensor(self.dep_df.loc[idx, 'heads'].tolist()).squeeze()		
+		}
 
-def bert_tokenizer(sent_parses):
-	'''Take in the parsed sentence and tokenize using BERT.'''
-	sents = []
-	new_sent_parses = []
-	for dicts in sent_parses:
-		sent = dicts['sent']
-		#Use BERT base uncased to encode the sentence by accessing input IDs and attention mask. Do not set a max length of truncate since this will not change
-		#The length of the sentence
-		encoding = tokenizer.encode_plus(sent, return_attention_mask = True)
-		#Create new corpus with input ids without sentence since it is unnecessary.
-		new_sent_parses.append({'input_ids': encoding['input_ids'], 'attention_mask': encoding['attention_mask'], 'word_ids': dicts['word_ids'], 'lemma_ids': dicts['lemma_ids'], 'deprel_ids': dicts['deprel_ids'], 'heads': dicts['heads']})
-	return new_sent_parses
+def dep_data_loaders(args, train_filename, valid_filename, test_filename):
+	train_conllu = LoadConllu(args.data_path, train_filename, mode = 'train')
+	valid_conllu = LoadConllu(args.data_path, valid_filename, mode = 'valid', vocab_dict = train_conllu.vocab_dict, pos_dict = train_conllu.pos_dict, label_dict = train_conllu.label_dict)
+	test_conllu = LoadConllu(args.data_path, test_filename, mode = 'test', vocab_dict = train_conllu.vocab_dict, pos_dict = train_conllu.pos_dict, label_dict = train_conllu.label_dict)
 
-#TESTING THE DATA LOADING CODE 
-def test_data_loading(base_path, filename):
-	#CoNLL-U preprocessing
-	lines = preproc_conllu(base_path, filename = filename)
+	train_dep_data, valid_dep_data, test_dep_data = DepData(train_conllu.sent_parses), DepData(valid_conllu.sent_parses), DepData(test_conllu.sent_parses)
+	train_data_loader, valid_data_loader, test_data_loader = data.DataLoader(train_dep_data, batch_size = 1, shuffle = args.shuffle), data.DataLoader(valid_dep_data, batch_size = 1, shuffle = args.shuffle), data.DataLoader(test_dep_data, batch_size = 1, shuffle = args.shuffle)
+	return train_data_loader, valid_data_loader, test_data_loader, train_conllu.vocab_dict, train_conllu.pos_dict, train_conllu.label_dict
 
-	#Collect sentences from CoNLLU
-	sent_collection = sentence_collection(lines)
-	# print(sent_collection)
+if __name__ == '__main__':
+	args = SimpleNamespace()
+	args.data_path = '../datasets/UD_English-EWT'
+	train_filename = 'en_ewt-ud-train.conllu'
+	valid_filename = 'en_ewt-ud-dev.conllu'
+	test_filename = 'en_ewt-ud-test.conllu'
+	args.shuffle = False
 
-	#Process the corpus
-	sent_parses, vocab_dict, label_dict, pos_dict = process_corpus(sent_collection, mode = 'train')
-	print(sent_parses[0])
-	# print(vocab_dict)
-	# print(label_dict)
-	# print(pos_dict)
-	# print(sent_parses[0])
-	# print(vocab_dict)
-
-	#Check BERT tokenizer
-	# new_sent_parses = bert_tokenizer(sent_parses)
-	# for i in range(len(new_sent_parses)):
-	# 	sent_dict = new_sent_parses[i]
-	# 	print('INPUT IDS:', len(sent_dict['input_ids']))
-	# 	print('LEMMA IDS:', len(sent_dict['word_ids']))
-
-# test_data_loading(base_path, filename = 'en_ewt-ud-train.conllu')
+	train_data_loader, valid_data_loader, test_data_loader, _, _, _ = dep_data_loaders(args, train_filename = train_filename, valid_filename = valid_filename, test_filename = test_filename)
+	print(len(train_data_loader))
+	for i in train_data_loader:
+		line = i
+		break

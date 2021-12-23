@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 import os
 import sys
 sys.path.insert(1, '../')
@@ -14,54 +16,7 @@ from dep_model import *
 from embedding_models import *
 from dep_data_load import *
 
-# base_path = '/storage/vsub851/typ_embed/depparse'
-# data_path = '/storage/vsub851/typ_embed/datasets'
-# train_filename = 'en_ewt-ud-train.conllu'
-# test_filename = 'en_ewt-ud-test.conllu'
-
-# seed = 0
-
-if cuda.is_available():
-	device = 'cuda'
-	# torch.cuda.manual_seed_all(seed)
-else:
-	print('WARNING, this program is running on CPU')
-	device = 'cpu'
-
-def arc_eval(base_path,
-	test_corpus,
-	eval_input,
-	num_words,
-	num_pos,
-	num_labels,
-	modelname,
-	word_embed_size = 100,
-	pos_embed_size = 100,
-	encoder = 'lstm',
-	lstm_hidden_size = 400,
-	dropout = 0.25,
-	lstm_layers = 4,
-	bert = 'bert-based-uncased',
-	bert_layer = 4,
-	scale = 0,
-	typological = False,
-	typ_embed_size = 32,
-	num_typ_features = 103,
-	typ_feature = 'syntax_knn',
-	typ_encode = 'concat',
-	attention_hidden_size = 200,
-	lang = 'en',
-	device = 'cpu'):
-	
-	pad_index = num_words
-	classifier = BiaffineDependencyModel(n_words = num_words, n_pos = num_pos, n_rels = num_labels, word_embed_size = word_embed_size, pos_embed_size = pos_embed_size,  
-		encoder = encoder, lstm_hidden_size = lstm_hidden_size, lstm_layers = lstm_layers, bert = bert, bert_pad_index = 0, dropout = dropout, n_bert_layer = bert_layer, 
-		n_arc_mlp = 500, n_rel_mlp = 100, scale = scale, pad_index = pad_index, unk_index = 0, typological = typological, typ_embed_size = typ_embed_size, 
-		num_typ_features = num_typ_features, typ_encode = typ_encode, attention_hidden_size = 200)
-
-	model_loc = os.path.join(base_path, 'saved_models', modelname)
-	classifier.load_state_dict(torch.load(model_loc))
-	
+def arc_eval(args, classifier, test_loader, device):
 	classifier = classifier.to(device)
 	classifier = classifier.double()
 	classifier.eval()
@@ -71,40 +26,29 @@ def arc_eval(base_path,
 	las_total_examples = 0
 	las_total_correct = 0
 
-	if typological:
+	if args.typological:
 		typ_str = 'with'
 	else:
 		typ_str = 'without'
 
-	print('Evaluating {} model {} typological features'.format(modelname, typ_str))
+	print('Evaluating {} model {} typological features'.format(args.modelname, typ_str))
 
-	for i in tqdm(range(0, len(test_corpus))):
-		sent_dict = test_corpus[i]
-		if encoder == 'lstm':
-			word_batch = []
-			pos_batch = []
-			word_batch.append(torch.tensor(sent_dict[eval_input]).long().to(device))
-			pos_batch.append(torch.tensor(sent_dict['pos_ids']).long().to(device))
-			word_batch = torch.stack(word_batch).to(device)
-			pos_batch = torch.stack(pos_batch).to(device)
+	for i, batch in tqdm(test_loader):
+		if args.encoder == 'lstm':
+			word_batch = batch['input_data'].to(device)
+			pos_batch = batch['pos_ids'].to(device)
 
 			s_arc, s_rel, mask = classifier.forward(words = word_batch, lang = lang, typ_feature = typ_feature, pos_tags = pos_batch, device = device)
 		else:
-			input_ids = []
-			attention_mask = []
-			word_batch = []
-			input_ids.append(torch.tensor(sent_dict['input_ids']).long().to(device))
-			attention_mask.append(torch.tensor(sent_dict['attention_mask']).long().to(device))
-			word_batch.append(torch.tensor(sent_dict[eval_input]).long().to(device))
-
-			input_ids = torch.stack(input_ids).to(device)
-			attention_mask = torch.stack(attention_mask).to(device)
-			word_batch = torch.stack(word_batch).to(device)
+			sentence = ' '.join([x[0] for x in batch['words']])
+			input_ids = args.tokenizer.encode(sentence, return_tensors = 'pt')
+			input_ids = input_ids.to(device)
+			word_batch = batch['input_data'].to(device)
 
 			s_arc, s_rel, mask = classifier.forward(words = word_batch, input_ids = input_ids, attention_mask = attention_mask, lang = lang, typ_feature = typ_feature, device = device)
-
-		arcs = sent_dict['heads']
-		rels = sent_dict['deprel_ids']
+		
+		arcs = batch['heads'].to(device)
+		rels = batch['deprel_ids'].to(device)
 
 		arc_preds, rel_preds = classifier.decode(s_arc = s_arc, s_rel = s_rel, mask = mask)
 
@@ -129,54 +73,44 @@ def arc_eval(base_path,
 
 	return 'UAS Score {}, LAS Score {}'.format(uas_total_correct/uas_total_examples, las_total_correct/las_total_examples)
 
-def test_eval(base_path,
-	data_path,
-	train_filename,
-	test_filename,
-	eval_input,
-	modelname,
-	word_embed_size = 100,
-	pos_embed_size = 100,
-	encoder = 'lstm',
-	lstm_hidden_size = 400,
-	dropout = 0.25,
-	lstm_layers = 3,
-	bert = 'bert-base-uncased',
-	bert_layer = 7,
-	scale = 0,
-	typological = True,
-	typ_embed_size = 32,
-	num_typ_features = 103,
-	typ_feature = 'syntax_knn',
-	typ_encode = 'concat',
-	attention_hidden_size = 200,
-	lang = 'en',
-	device = 'cpu'):
-	
-	file_path = os.path.join(data_path, 'UD_English-EWT')
-	print('Loading data from training file {} and testing file {}'.format(train_filename, test_filename))
-	train_lines = preproc_conllu(file_path, filename = train_filename)
-	train_sent_collection = sentence_collection(train_lines)
-	if eval_input == 'lemma_ids':
-		input_type = 'lemma'
-	else:
-		input_type = 'form'
-	train_corpus, vocab_dict, label_dict, pos_dict = process_corpus(train_sent_collection, mode = 'train', input_type = input_type)
+if __name__ == '__main__':
+	args = SimpleNamespace()
+	args.base_path = './'
+	args.data_path = '../datasets'
+	args.data_path = '../datasets/UD_English-EWT'
+	train_filename = 'en_ewt-ud-train.conllu'
+	valid_filename = 'en_ewt-ud-dev.conllu'
+	test_filename = 'en_ewt-ud-test.conllu'
+	args.shuffle = False
+	args.word_embed_size = 100
+	args.pos_embed_size = 100
+	args.encoder = 'lstm'
+	args.lstm_hidden_size = 400
+	args.lstm_layers = 3
+	args.lm_model_name = 'bert-base-uncased'
+	args.bert_layer = 4
+	args.modelname = 'lstm_model_1.pt'
+	args.scale = 0
+	args.dropout = 0.33
+	args.typological = False
+	args.typ_embed_size = 32
+	args.num_typ_features = 289
+	args.typ_encode = 'concat'
+	args.attention_hidden_size = 200
+	args.typ_feature = 'syntax_knn+phonology_knn+inventory_knn'
+	args.lang = 'en'
+	args.save_model = False
+	args.lr = 0.005
+	args.tokenizer = transformers.BertTokenizer.from_pretrained(args.lm_model_name) if 'bert' in args.lm_model_name else transformers.GPT2Model.from_pretrained(args.lm_model_name)
+	device = 'cuda' if torch.cuda.is_available() else 'cpu'
+	args.fine_tune = True
 
-	test_lines = preproc_conllu(file_path, filename = test_filename)
-	test_sent_collection = sentence_collection(test_lines)
-	test_corpus, _, _, _ = process_corpus(test_sent_collection, mode = 'test', vocab_dict = vocab_dict, label_dict = label_dict, pos_dict = pos_dict, input_type = input_type)
-	print('Finished loading data')
+	train_data_loader, valid_data_loader, test_data_loader, vocab_dict, pos_dict, label_dict = dep_data_loaders(args, train_filename = train_filename, valid_filename = valid_filename, test_filename = test_filename)
+	classifier = BiaffineDependencyModel(n_words = num_words, n_pos = num_pos, n_rels = num_labels, word_embed_size = args.word_embed_size, pos_embed_size = args.pos_embed_size, lstm_hidden_size = args.lstm_hidden_size, encoder = args.encoder, lstm_layers = args.lstm_layers, 
+		lm_model_name = args.lm_model_name, dropout = args.dropout, n_lm_layer = args.lm_layer, n_arc_mlp = 500, n_rel_mlp = 100, scale = args.scale, pad_index = pad_index, 
+		unk_index = 0, typological = args.typological, typ_embed_size = args.typ_embed_size, num_typ_features = args.num_typ_features, 
+		typ_encode = args.typ_encode, attention_hidden_size = args.attention_hidden_size, fine_tune = args.fine_tune)
 
-	num_words = len(vocab_dict)
-	num_labels = len(label_dict)
-	num_pos = len(pos_dict)
-
-	if encoder == 'bert':
-		test_corpus = bert_tokenizer(test_corpus)
-
-	print(arc_eval(base_path = base_path, test_corpus = test_corpus, eval_input = eval_input, num_words = num_words, num_pos = num_pos, num_labels = num_labels, modelname = modelname, word_embed_size = word_embed_size, pos_embed_size = pos_embed_size, encoder = encoder, lstm_hidden_size = lstm_hidden_size, dropout = dropout, 
-		lstm_layers = lstm_layers, bert = bert, bert_layer = bert_layer, scale = scale, typological = typological, typ_embed_size = typ_embed_size, typ_feature = typ_feature, num_typ_features = num_typ_features, typ_encode = typ_encode, attention_hidden_size = attention_hidden_size, lang = lang, device = device))
-
-# test_eval(base_path = base_path, data_path = data_path, train_filename = train_filename, test_filename = test_filename, eval_input = 'lemma_ids', modelname = 'dep5_lstm_typ.pt', dropout = 0.33, device = device,
-# 	encoder = 'lstm')
+	classifier.load_state_dict(torch.load(os.path.join(args.base_path, 'saved_models', args.modelname)))
+	print(arc_eval(args, classifier, test_loader))
+	pass

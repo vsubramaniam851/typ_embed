@@ -17,10 +17,9 @@ class POSTaggingModel(nn.Module):
 		lstm_hidden_size = 400,
 		encoder = 'lstm',
 		lstm_layers = 3,
-		bert = None,
-		bert_pad_index = 0,
+		lm_model_name = None, 		
 		dropout = 0.33,
-		n_bert_layer = 4,
+		n_lm_layer = 4,
 		mlp_hidden_size = 200,
 		typological = False,
 		typ_embed_size = 32,
@@ -32,13 +31,13 @@ class POSTaggingModel(nn.Module):
 
 		self.encoder = encoder
 		if encoder == 'lstm':
-			self.encode = LSTMEmbedding(num_words = n_words, num_pos = 0, lstm_layers = lstm_layers, word_embed_size = word_embed_size, pos_embed_size = 0, 
-				lstm_hidden_size = lstm_hidden_size, dropout = dropout, typological = typological, typ_embed_size = typ_embed_size, num_typ_features = num_typ_features,
-				typ_encode = typ_encode, attention_hidden_size = attention_hidden_size)
-			n_embed = lstm_hidden_size * 2 
-		elif encoder == 'bert':
-			self.encode = BERTEmbedding(bert = bert, typological = typological, bert_pad_index = bert_pad_index, bert_hidden_size = 768, typ_embed_size = typ_embed_size,
-				num_typ_features = num_typ_features, bert_layer = n_bert_layer, typ_encode = typ_encode, attention_hidden_size = attention_hidden_size)
+			self.encode = LSTMEmbedding(num_words = n_words, num_pos = n_pos, lstm_layers = lstm_layers, word_embed_size = word_embed_size, pos_embed_size = pos_embed_size, 
+				lstm_hidden_size = lstm_hidden_size, dropout = dropout, typological = typological, typ_embed_size = typ_embed_size, num_typ_features = num_typ_features, typ_encode = typ_encode,
+				attention_hidden_size = attention_hidden_size)
+			n_embed = lstm_hidden_size * 2
+		elif encoder == 'lm':
+			self.encode = LMEmbedding(lm_model_name = lm_model_name, typological = typological, bert_hidden_size = 768, typ_embed_size = typ_embed_size, 
+				num_typ_features = num_typ_features, lm_layer = n_lm_layer, typ_encode = typ_encode, attention_hidden_size = attention_hidden_size, fine_tune = True)
 			n_embed = 768
 		else:
 			n_embed = 0
@@ -52,11 +51,11 @@ class POSTaggingModel(nn.Module):
 		self.mlp = MLP(n_in = n_embed, n_out = n_tags, mlp_hidden_size = mlp_hidden_size, dropout = dropout)
 		self.criterion = nn.CrossEntropyLoss()
 	
-	def forward(self, words = None, lang = 'en', typ_feature = 'syntax_knn+phonology_knn+inventory_knn', input_ids = None, attention_mask = None, device = 'cpu'):
+	def forward(self, words = None, lang = 'en', typ_feature = 'syntax_knn+phonology_knn+inventory_knn', input_ids = None, sentence = None, device = 'cpu'):
 		if self.encoder == 'lstm':
 			x = self.encode(words = words, pos_tags = None, lang = lang, typ_feature = typ_feature, device = device)
 		else:
-			x = self.encode(input_ids = input_ids, attention_mask = attention_mask, lang=  lang, typ_feature = typ_feature, device = device)
+			x = self.encode(input_ids = input_ids, lang=  lang, typ_feature = typ_feature, sentence=  sentence, device = device)
 
 		assert(x.size(2) == self.n_embed), 'Check if size of encoding is correct'
 

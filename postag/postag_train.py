@@ -16,57 +16,12 @@ from postag_data_load import *
 
 import transformers
 
-seed = 0
-random.seed(seed)
-np.random.seed(seed)
-torch.manual_seed(seed)
+def pos_train(args, train_loader, valid_loader, num_words, num_labels, device):
+	classifier = POSTaggingModel(n_words = num_words, n_tags = num_labels, word_embed_size = args.word_embed_size, lstm_hidden_size = args.lstm_hidden_size, encoder = args.encoder, lstm_layers = args.lstm_layers,
+		lm_model_name = args.lm_model_name, dropout = dropout, n_lm_layer = args.lm_layer, mlp_hidden_size = args.mlp_hidden_size, typological = args.typological, typ_embed_size = args.typ_embed_size, num_typ_features = args.num_typ_features, 
+		typ_encode = args.typ_encode, attention_hidden_size = args.attention_hidden_size, fine_tune = args.fine_tune)
 
-if cuda.is_available():
-	device = 'cuda'
-	torch.cuda.manual_seed_all(seed)
-else:
-	print('WARNING, this program is running on CPU')
-	device = 'cpu'
-
-# lm_pretrained = transformers.BertModel.from_pretrained('bert-base-uncased').to(device)
-
-base_path = '/storage/vsub851/typ_embed/postag'
-data_path = '/storage/vsub851/typ_embed/datasets'
-train_filename = 'en_ewt-ud-train.conllu'
-valid_filename = 'en_ewt-ud-dev.conllu'
-
-def pos_train(base_path,
-	train_corpus,
-	valid_corpus,
-	train_type,
-	num_words,
-	num_labels,
-	modelname,
-	word_embed_size = 100,
-	encoder = 'lstm',
-	lstm_hidden_size = 400,
-	mlp_hidden_size = 200,
-	lr = 0.0005,
-	dropout = 0.33,
-	num_epochs = 3,
-	lstm_layers = 3,
-	batch_size = 1,
-	bert = 'bert-base-uncased',
-	bert_layer = 4,
-	typological = False,
-	typ_embed_size = 32,
-	num_typ_features = 289,
-	typ_feature = 'syntax_knn+phonology_knn+inventory_knn',
-	typ_encode = 'concat',
-	attention_hidden_size = 200,
-	lang = 'en',
-	device = 'cpu'):
-
-	classifier = POSTaggingModel(n_words = num_words, n_tags = num_labels, word_embed_size = word_embed_size, lstm_hidden_size = lstm_hidden_size, encoder = encoder, lstm_layers = lstm_layers,
-		bert = bert, dropout = dropout, n_bert_layer = bert_layer, mlp_hidden_size = mlp_hidden_size, typological = typological, typ_embed_size = typ_embed_size, num_typ_features = num_typ_features, 
-		typ_encode = typ_encode, attention_hidden_size = attention_hidden_size)
-
-	optimizer = optim.Adam(classifier.parameters(), lr = lr)
+	optimizer = optim.Adam(classifier.parameters(), lr = args.lr)
 
 	classifier = classifier.to(device)
 	classifier = classifier.double()
@@ -77,41 +32,26 @@ def pos_train(base_path,
 	else:
 		typ_str = 'without'
 
-	print('Beginning training on {} with encoder {} and {} typological features'.format(train_type, encoder, typ_str))
+	print('Beginning training on {} with encoder {} and {} typological features'.format(args.input_type, args.encoder, args.typ_str))
 	for epoch in range(num_epochs):
 		total_loss = 0
 		classifier.train()
-		for i in range(0, len(train_corpus), batch_size):
+		for i, batch in enumerate(train_loader):
 			if i % 1000 == 0:
 				print('Epoch {} Train Batch {}'.format(epoch, i))
-			batch = train_corpus[i:i+batch_size]
 			if encoder == 'lstm':
-				word_batch = []
-				pos_tags = []
-				for sent in batch:
-					word_batch.append(torch.tensor(sent[train_type]).long().to(device))
-					pos_tags.append(torch.tensor(sent['pos_tags']).long().to(device))
-				word_batch = torch.stack(word_batch).to(device)
-				pos_tags = torch.stack(pos_tags).to(device)
+				word_batch = batch['input_data'].to(device)
+				pos_batch = batch['pos_ids'].squeeze(0).to(device)
 
-				pos_tags = pos_tags.squeeze(0)
-
-				pos_preds = classifier.forward(words = word_batch, lang = lang, typ_feature = typ_feature, device = device)
+				pos_preds = classifier.forward(words = word_batch, lang = args.lang, typ_feature = args.typ_feature, pos_tags = pos_batch, device = device)
 			else:
-				input_ids = []
-				attention_mask = []
-				pos_tags = []
-				for sent in batch:
-					input_ids.append(torch.tensor(sent['input_ids']).long().to(device))
-					attention_mask.append(torch.tensor(sent['attention_mask']).long().to(device))
-					pos_tags.append(torch.tensor(sent['pos_tags']).long().to(device))
-				input_ids = torch.stack(input_ids).to(device)
-				attention_mask = torch.stack(attention_mask).to(device)
-				pos_tags = torch.stack(pos_tags).to(device)
+				sentence = ' '.join([x[0] for x in batch['words']])
+				input_ids = args.tokenizer.encode(sentence, return_tensors = 'pt')
+				input_ids = input_ids.to(device)
+				word_batch = batch['input_data'].to(device)
+				pos_batch = batch['pos_ids'].squeeze(0).to(device)
 
-				pos_tags = pos_tags.squeeze(0)
-
-				pos_preds = classifier.forward(input_ids = input_ids, attention_mask = attention_mask, lang = lang, typ_feature = typ_feature, device = device)
+				pos_preds = classifier.forward(words = word_batch, input_ids = input_ids, lang = args.lang, typ_feature = args.typ_feature, sentence = batch['words'], device = device)
 
 			loss = classifier.loss(pred_tags = pos_preds, tags = pos_tags)
 			loss.backward()
@@ -119,41 +59,26 @@ def pos_train(base_path,
 			optimizer.zero_grad()
 			total_loss = total_loss + loss.item()
 
-		print('Epoch {}, train loss={}'.format(epoch, total_loss / len(train_corpus)))
+		print('Epoch {}, train loss={}'.format(epoch, total_loss / len(train_loader)))
 		total_loss = 0
 		classifier.eval()
 
-		for i in range(0, len(valid_corpus), batch_size):
+		for i, batch in enumerate(valid_loader):
 			if i%1000 == 0:
 				print('Epoch {} Valid Batch {}'.format(epoch, i))
-			batch = train_corpus[i:i+batch_size]
 			if encoder == 'lstm':
-				word_batch = []
-				pos_tags = []
-				for sent in batch:
-					word_batch.append(torch.tensor(sent[train_type]).long().to(device))
-					pos_tags.append(torch.tensor(sent['pos_tags']).long().to(device))
-				word_batch = torch.stack(word_batch).to(device)
-				pos_tags = torch.stack(pos_tags).to(device)
+				word_batch = batch['input_data'].to(device)
+				pos_batch = batch['pos_ids'].squeeze(0).to(device)
 
-				pos_tags = pos_tags.squeeze(0)
-
-				pos_preds = classifier.forward(words = word_batch, lang = lang, typ_feature = typ_feature, device = device)
+				pos_preds = classifier.forward(words = word_batch, lang = args.lang, typ_feature = args.typ_feature, pos_tags = pos_batch, device = device)
 			else:
-				input_ids = []
-				attention_mask = []
-				pos_tags = []
-				for sent in batch:
-					input_ids.append(torch.tensor(sent['input_ids']).long().to(device))
-					attention_mask.append(torch.tensor(sent['attention_mask']).long().to(device))
-					pos_tags.append(torch.tensor(sent['pos_tags']).long().to(device))
-				input_ids = torch.stack(input_ids).to(device)
-				attention_mask = torch.stack(attention_mask).to(device)
-				pos_tags = torch.stack(pos_tags).to(device)
+				sentence = ' '.join([x[0] for x in batch['words']])
+				input_ids = args.tokenizer.encode(sentence, return_tensors = 'pt')
+				input_ids = input_ids.to(device)
+				word_batch = batch['input_data'].to(device)
+				pos_batch = batch['pos_ids'].squeeze(0).to(device)
 
-				pos_tags = pos_tags.squeeze(0)
-
-				pos_preds = classifier.forward(input_ids = input_ids, attention_mask = attention_mask, lang = lang, typ_feature = typ_feature, device = device)
+				pos_preds = classifier.forward(words = word_batch, input_ids = input_ids, lang = args.lang, typ_feature = args.typ_feature, sentence = batch['words'], device = device)
 
 			loss = classifier.loss(pred_tags = pos_preds, tags = pos_tags)
 			total_loss = total_loss + loss.item()
@@ -163,58 +88,35 @@ def pos_train(base_path,
 	save_path = os.path.join(base_path, 'saved_models', modelname)
 	torch.save(classifier.state_dict(), save_path)
 
-def test_train(base_path,
-	data_path,
-	train_filename,
-	valid_filename,
-	train_type,
-	modelname,
-	word_embed_size = 100,
-	encoder = 'lstm',
-	lstm_hidden_size = 400,
-	mlp_hidden_size = 200,
-	lr = 0.0005,
-	dropout = 0.33,
-	num_epochs = 3,
-	lstm_layers = 3,
-	batch_size = 1,
-	bert = 'bert-base-uncased',
-	bert_layer = 4,
-	typological = False,
-	typ_embed_size = 32,
-	num_typ_features = 289,
-	typ_feature = 'syntax_knn+phonology_knn+inventory_knn',
-	typ_encode = 'concat',
-	attention_hidden_size = 200,
-	lang = 'en',
-	device = 'cpu'):
+if __name__ == '__main__':
+	args = SimpleNamespace()
+	args.base_path = './'
+	args.data_path = '../datasets/UD_English-EWT'
+	train_filename = 'en_ewt-ud-train.conllu'
+	valid_filename = 'en_ewt-ud-dev.conllu'
+	test_filename = 'en_ewt-ud-test.conllu'
+	args.shuffle = False
+	args.word_embed_size = 100
+	args.pos_embed_size = 100
+	args.encoder = 'lstm'
+	args.lstm_hidden_size = 400
+	args.lstm_layers = 3
+	args.lm_model_name = 'bert-base-uncased'
+	args.lm_layer = 4
+	args.dropout = 0.33
+	args.typological = False
+	args.typ_embed_size = 32
+	args.num_typ_features = 289
+	args.typ_encode = 'concat'
+	args.attention_hidden_size = 200
+	args.typ_feature = 'syntax_knn+phonology_knn+inventory_knn'
+	args.lang = 'en'
+	args.save_model = False
+	args.modelname = 'lstm_model_1.pt'
+	args.lr = 0.005
+	args.tokenizer = transformers.BertTokenizer.from_pretrained(args.lm_model_name) if 'bert' in args.lm_model_name else transformers.GPT2Model.from_pretrained(args.lm_model_name)
+	device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-	#Load data
-	print('Loading data from training file {} and validation file {}'.format(train_filename, valid_filename))
-
-	file_path = os.path.join(data_path, 'UD_English-EWT')
-	train_lines = preproc_conllu(file_path, filename = train_filename)
-	train_sent_collection = sentence_collection(train_lines)
-	if train_type == 'lemma_ids':
-		input_type = 'lemma'
-	else:
-		input_type = 'form'
-
-	train_corpus, vocab_dict, label_dict = process_corpus(train_sent_collection, mode = 'train', input_type = input_type)
-
-	valid_lines = preproc_conllu(file_path, filename = valid_filename)
-	valid_sent_collection = sentence_collection(valid_lines)
-	valid_corpus, _, _ = process_corpus(valid_sent_collection, mode = 'valid', vocab_dict = vocab_dict, label_dict = label_dict, input_type = input_type)
-
-	if encoder == 'bert':
-		train_corpus = bert_tokenizer(train_corpus)
-		valid_corpus = bert_tokenizer(valid_corpus)
-
-	print('Data loading complete')
-
-	pos_train(base_path = base_path, train_corpus = train_corpus, valid_corpus = valid_corpus, train_type = train_type, num_words = len(vocab_dict), num_labels = len(label_dict),
-		modelname = modelname, word_embed_size = word_embed_size, encoder = encoder, lstm_hidden_size = lstm_hidden_size, mlp_hidden_size = mlp_hidden_size, lr = lr, dropout = dropout,
-		num_epochs = num_epochs, lstm_layers = lstm_layers, batch_size = batch_size, bert = bert, bert_layer = bert_layer, typological = typological, typ_embed_size = typ_embed_size,
-		num_typ_features = num_typ_features, typ_feature = typ_feature, typ_encode = typ_encode, attention_hidden_size = attention_hidden_size, lang = lang, device = device)
-
-# test_train(base_path = base_path, data_path = data_path, train_filename = train_filename, valid_filename = valid_filename, train_type = 'lemma_ids', modelname = 'pos1_lstm.pt', device = device)
+	train_data_loader, valid_data_loader, test_data_loader, vocab_dict, pos_dict, label_dict = dep_data_loaders(args, train_filename = train_filename, valid_filename = valid_filename, test_filename = test_filename)
+	classifier = arc_train(args, train_loader, valid_loader, num_words = len(vocab_dict), num_pos = len(pos_dict), num_labels = len(label_dict))
+	pass

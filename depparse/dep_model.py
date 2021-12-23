@@ -19,10 +19,9 @@ class BiaffineDependencyModel(nn.Module):
 		lstm_hidden_size = 400, 
 		encoder = 'lstm', 
 		lstm_layers = 3, 
-		bert = None, 
-		bert_pad_index = 0, 
+		lm_model_name = None, 
 		dropout = 0.33, 
-		n_bert_layer = 4, 
+		n_lm_layer = 4, 
 		n_arc_mlp = 500, 
 		n_rel_mlp = 100, 
 		scale = 0, 
@@ -32,7 +31,8 @@ class BiaffineDependencyModel(nn.Module):
 		typ_embed_size = 32, 
 		num_typ_features = 289,
 		typ_encode = 'concat',
-		attention_hidden_size = 200):
+		attention_hidden_size = 200,
+		fine_tune = True):
 
 		super(BiaffineDependencyModel, self).__init__()
 
@@ -43,9 +43,9 @@ class BiaffineDependencyModel(nn.Module):
 				lstm_hidden_size = lstm_hidden_size, dropout = dropout, typological = typological, typ_embed_size = typ_embed_size, num_typ_features = num_typ_features, typ_encode = typ_encode,
 				attention_hidden_size = attention_hidden_size)
 			n_embed = lstm_hidden_size * 2
-		elif encoder == 'bert':
-			self.encode = BERTEmbedding(bert = bert, typological = typological, bert_pad_index = bert_pad_index, bert_hidden_size = 768, typ_embed_size = typ_embed_size, 
-				num_typ_features = num_typ_features, bert_layer = n_bert_layer, typ_encode = typ_encode, attention_hidden_size = attention_hidden_size)
+		elif encoder == 'lm':
+			self.encode = LMEmbedding(lm_model_name = lm_model_name, typological = typological, bert_hidden_size = 768, typ_embed_size = typ_embed_size, 
+				num_typ_features = num_typ_features, lm_layer = n_lm_layer, typ_encode = typ_encode, attention_hidden_size = attention_hidden_size, fine_tune = True)
 			n_embed = 768
 		else:
 			n_embed = 0
@@ -64,11 +64,11 @@ class BiaffineDependencyModel(nn.Module):
 		self.rel_attn = Biaffine(n_in = n_rel_mlp, n_out = n_rels, bias_x = True, bias_y = True)
 		self.criterion = nn.CrossEntropyLoss()
 
-	def forward(self, words, lang = 'en', typ_feature = 'syntax_knn+phonology_knn+inventory_knn', pos_tags = None, input_ids = None, attention_mask = None, device = 'cpu'):
+	def forward(self, words, lang = 'en', typ_feature = 'syntax_knn+phonology_knn+inventory_knn', pos_tags = None, input_ids = None, sentence = None, device = 'cpu'):
 		if self.encoder == 'lstm':
 			x = self.encode(words = words, pos_tags = pos_tags, lang = lang, typ_feature = typ_feature, device = device)
 		else:
-			x = self.encode(input_ids = input_ids, attention_mask = attention_mask, lang = lang, typ_feature = typ_feature, device = device)
+			x = self.encode(input_ids = input_ids, sentence = sentence, lang = lang, typ_feature = typ_feature, device = device)
 		assert(x.size(2) == self.n_embed), 'Check if size of encoding is correct'
 
 		mask = words.ne(self.pad_index) if len(words.shape) < 3 else words.ne(self.pad_index).any(-1)
