@@ -1,7 +1,6 @@
 import sys
 import os
 import argparse
-import unittest
 
 import torch
 import torch.cuda as cuda
@@ -10,16 +9,6 @@ sys.path.insert(1, './depparse')
 sys.path.insert(1, './postag')
 from depparse.dep_main import *
 from postag.postag_main import *
-
-eed = 0
-if cuda.is_available():
-	device = 'cuda'
-	torch.cuda.manual_seed_all(seed)
-else:
-	print('WARNING, this program is running on CPU')
-	device = 'cpu'
-
-print('Using device: {}'.format(device)) #Ensure on GPU!
 
 def get_cmd_arguments():
 	ap = argparse.ArgumentParser()
@@ -30,28 +19,49 @@ def get_cmd_arguments():
 
 	#DEPENDENCY PARSER ARGUMENTS
 
-	dep_parser.add_argument('-p', '--path', action = 'store', type = str, dest = 'base_path', default = './depparse',
+	dep_parser.add_argument('-p', '--path', action = 'store', type = str, dest = 'base_path', default = './',
 		help = 'Base path to all Dependency Parsing models and data')
-	dep_parser.add_argument('-d', '--data', action = 'store', type = str, dest = 'data_path', default = './datasets', 
+	dep_parser.add_argument('-d', '--data', action = 'store', type = str, dest = 'data_path', default = '../datasets', 
 		help = 'Dataset location')
-	dep_parser.add_argument('-t', '--train', action = 'store', type = bool, dest = 'train_model', default = False,
+	dep_parser.add_argument('-t', '--train', action = 'store_true', dest = 'train_model',
 		help = 'Train a new model, saved in saved_models directory in depparse directory')
+	dep_parser.add_argument('-ev', '--eval', action = 'store_false', dest = 'train_model', 
+		help = 'Evaluate a pre-existing model, saved in saved_models directory in the depparse directory')
+	dep_parser.set_defaults(train_model = False)
 	dep_parser.add_argument('-m', '--model', action = 'store', type = str, dest = 'modelname', default = 'dep_model.pt', 
 		help = 'Name of saved model that is either being trained or being evaluated. Most be stored in saved_models directory')
 	dep_parser.add_argument('-l', '--lang', action = 'store', type = str, dest = 'lang', default = 'en',
 		help = 'Language to run dependency parsing model on')
 	dep_parser.add_argument('-i', '--input', action = 'store', type = str, dest = 'input_type', default = 'form',
 		help = 'Type of input to run through LSTM, either form or lemma')
-	dep_parser.add_argument('-ty', '--typological', action = 'store', type = bool, dest = 'typological', default = False,
+	dep_parser.add_argument('-ty', '--typological', action = 'store_true', dest = 'typological',
 		help = 'Include typological features in training')
+	dep_parser.add_argument('-nty', '--notypological', action = 'store_false', dest = 'typological',
+		help = 'Do not include typological features in training')
+	dep_parser.set_defaults(typological = False)
 	dep_parser.add_argument('-tf', '--typfeatures', action = 'store', type = str, dest = 'typ_feature', default = 'syntax_knn',
 		help = 'Which typological features to extract from the typological database')
 	dep_parser.add_argument('-e', '--encoder', action = 'store', type = str, dest = 'encoder', default = 'lstm',
-		help = 'Word Embedding model, either BERT or LSTM')
+		help = 'Word Embedding model, either LM or LSTM')
 	dep_parser.add_argument('-te', '--typencode', action = 'store', type = str, dest = 'typ_encode', default = 'concat',
 		help = 'Method to use for incorporating typological features. Choose from [concat, add_att, mul_att] to decide to either use a concatentation or attention method')
+	dep_parser.add_argument('-ft', '--fine_tune', action = 'store_true', dest = 'fine_tune',
+		help = 'Fine tune language model')
+	dep_parser.add_argument('-nft', '--no_fine_tune', action = 'store_false', dest = 'fine_tune',
+		help = 'Use frozen representations')
+	dep_parser.set_defaults(fine_tune = True)
+	dep_parser.add_argument('-sh', '--shuffle', action = 'store_true', dest = 'shuffle',
+		help = 'Shuffle data in data loaders')
+	dep_parser.add_argument('-nsh', '--no_shuffle', action = 'store_false', dest = 'shuffle',
+		help = 'Keep data order the same')
+	dep_parser.set_defaults(shuffle = False)
+	dep_parser.add_argument('-sm', '--save_model', action = 'store_true', dest = 'save_model', 
+		help = 'Save a trained model')
+	dep_parser.add_argument('-nsm', '--no_save', action = 'store_false', dest = 'save_model',
+		help = 'Don\'t save a run')
+	dep_parser.set_defaults(save_model = True)
 
-	# Dependency Parsing Model Hyperparameters
+	#Dependency Parsing Model Hyperparameters
 	dep_parser.add_argument('-wes', '--wordsize', action = 'store', dest = 'word_embed_size', type = int, default = 100, 
 		help = 'Word Embedding Size for model')
 	dep_parser.add_argument('-pes', '--possize', action = 'store', dest = 'pos_embed_size', type = int, default = 100,
@@ -64,13 +74,13 @@ def get_cmd_arguments():
 		help = 'Number of LSTM Layers in LSTM encoder')
 	dep_parser.add_argument('-dr', '--dropout', action = 'store', dest = 'dropout', type = float, default = 0.33,
 		help = 'Dropout probability to be used in all components of model')
-	dep_parser.add_argument('-b', '--bert', action = 'store', dest = 'bert', type = str, default = 'bert-base-uncased',
+	dep_parser.add_argument('-lm', '--lm_model_name', action = 'store', dest = 'lm_model_name', type = str, default = 'bert-base-uncased',
 		help = 'BERT Model to use when using BERT as encoder')
 	dep_parser.add_argument('-tes', '--typsize', action = 'store', dest = 'typ_embed_size', type = int, default = 32,
 		help = 'Embedding size for typological embedding vector')
 	dep_parser.add_argument('-nt', '--numtyp', action = 'store', type = int, dest = 'num_typ_features', default = 103,
 		help = 'Number of typological features in the typological features extracted.')
-	dep_parser.add_argument('-bl', '--bertlayer', action = 'store', dest = 'bert_layer', type = int, default = 8,
+	dep_parser.add_argument('-lml', '--lmlayer', action = 'store', dest = 'lm_layer', type = int, default = 8,
 		help = 'Layer to obtain BERT representations from')
 	dep_parser.add_argument('-sc', '--scale', action = 'store', dest = 'scale', type = float, default = 0,
 		help = 'Scaling factor for biaffine attention')
@@ -79,119 +89,121 @@ def get_cmd_arguments():
 	dep_parser.add_argument('-ep', '--numepochs', action = 'store', dest = 'num_epochs', type = int, default = 10,
 		help = 'Number of epochs of training')
 
-	#POS Tagger Arguments
+	#POS TAGGER ARGUMENTS
 
-	pos_parser.add_argument('-p', '--path', action = 'store', type = str, dest = 'base_path', default = './postag',
+	pos_parser.add_argument('-p', '--path', action = 'store', type = str, dest = 'base_path', default = './',
 		help = 'Base path to all Dependency Parsing models and data')
-	pos_parser.add_argument('-d', '--data', action = 'store', type = str, dest = 'data_path', default = './datasets', 
+	pos_parser.add_argument('-d', '--data', action = 'store', type = str, dest = 'data_path', default = '../datasets', 
 		help = 'Dataset location')
-	pos_parser.add_argument('-t', '--train', action = 'store', type = bool, dest = 'train_model', default = False,
-		help = 'Train a new model, saved in saved_models directory in postag directory')
+	pos_parser.add_argument('-t', '--train', action = 'store_true', dest = 'train_model',
+		help = 'Train a new model, saved in saved_models directory in depparse directory')
+	pos_parser.add_argument('-ev', '--eval', action = 'store_false', dest = 'train_model', 
+		help = 'Evaluate a pre-existing model, saved in saved_models directory in the depparse directory')
+	pos_parser.set_defaults(train_model = False)
 	pos_parser.add_argument('-m', '--model', action = 'store', type = str, dest = 'modelname', default = 'dep_model.pt', 
 		help = 'Name of saved model that is either being trained or being evaluated. Most be stored in saved_models directory')
 	pos_parser.add_argument('-l', '--lang', action = 'store', type = str, dest = 'lang', default = 'en',
 		help = 'Language to run dependency parsing model on')
 	pos_parser.add_argument('-i', '--input', action = 'store', type = str, dest = 'input_type', default = 'form',
 		help = 'Type of input to run through LSTM, either form or lemma')
-	pos_parser.add_argument('-ty', '--typological', action = 'store', type = bool, dest = 'typological', default = False,
+	pos_parser.add_argument('-ty', '--typological', action = 'store_true', dest = 'typological',
 		help = 'Include typological features in training')
+	pos_parser.add_argument('-nty', '--notypological', action = 'store_false', dest = 'typological',
+		help = 'Do not include typological features in training')
+	pos_parser.set_defaults(typological = False)
 	pos_parser.add_argument('-tf', '--typfeatures', action = 'store', type = str, dest = 'typ_feature', default = 'syntax_knn',
 		help = 'Which typological features to extract from the typological database')
 	pos_parser.add_argument('-e', '--encoder', action = 'store', type = str, dest = 'encoder', default = 'lstm',
-		help = 'Word Embedding model, either BERT or LSTM')
+		help = 'Word Embedding model, either LM or LSTM')
 	pos_parser.add_argument('-te', '--typencode', action = 'store', type = str, dest = 'typ_encode', default = 'concat',
-		help = 'Method to use for incorporating typological features. Choose from /[concat, add_att, mul_att]/ to decide to either use a concatentation or attention method')
+		help = 'Method to use for incorporating typological features. Choose from [concat, add_att, mul_att] to decide to either use a concatentation or attention method')
+	pos_parser.add_argument('-ft', '--fine_tune', action = 'store_true', dest = 'fine_tune',
+		help = 'Fine tune language model')
+	pos_parser.add_argument('-nft', '--no_fine_tune', action = 'store_false', dest = 'fine_tune',
+		help = 'Use frozen representations')
+	pos_parser.set_defaults(fine_tune = True)
+	pos_parser.add_argument('-sh', '--shuffle', action = 'store_true', dest = 'shuffle',
+		help = 'Shuffle data in data loaders')
+	pos_parser.add_argument('-nsh', '--no_shuffle', action = 'store_false', dest = 'shuffle',
+		help = 'Keep data order the same')
+	pos_parser.set_defaults(shuffle = False)
+	pos_parser.add_argument('-sm', '--save_model', action = 'store_true', dest = 'save_model', 
+		help = 'Save a trained model')
+	pos_parser.add_argument('-nsm', '--no_save', action = 'store_false', dest = 'save_model',
+		help = 'Don\'t save a run')
+	pos_parser.set_defaults(save_model = True)
 
-	#POS Tagging Model Hyperparameters
+	#Model Hyperparameters
 	pos_parser.add_argument('-wes', '--wordsize', action = 'store', dest = 'word_embed_size', type = int, default = 100, 
 		help = 'Word Embedding Size for model')
+	pos_parser.add_argument('-pes', '--possize', action = 'store', dest = 'pos_embed_size', type = int, default = 100,
+		help = 'POS Embedding Size for model')
 	pos_parser.add_argument('-lhs', '--lstmsize', action = 'store', dest = 'lstm_hidden_size', type = int, default = 400, 
 		help = 'LSTM Hidden size when using encoder LSTM')
-	pos_parser.add_argument('-mhs', '--mlpsize', action = 'store', dest = 'mlp_hidden_size', type = int, default = 200,
-		help = 'Hidden size in MLP')
 	pos_parser.add_argument('-ahs', '--attentionsize', action = 'store', dest = 'attention_hidden_size', type = int, default = 200,
 		help = 'Multiplicative Attention Hidden Size')
 	pos_parser.add_argument('-ll', '--lstmlayers', action = 'store', dest = 'lstm_layers', type = int, default = 3,
 		help = 'Number of LSTM Layers in LSTM encoder')
 	pos_parser.add_argument('-dr', '--dropout', action = 'store', dest = 'dropout', type = float, default = 0.33,
 		help = 'Dropout probability to be used in all components of model')
-	pos_parser.add_argument('-b', '--bert', action = 'store', dest = 'bert', type = str, default = 'bert-base-uncased',
+	pos_parser.add_argument('-lm', '--lm_model_name', action = 'store', dest = 'lm_model_name', type = str, default = 'bert-base-uncased',
 		help = 'BERT Model to use when using BERT as encoder')
 	pos_parser.add_argument('-tes', '--typsize', action = 'store', dest = 'typ_embed_size', type = int, default = 32,
 		help = 'Embedding size for typological embedding vector')
 	pos_parser.add_argument('-nt', '--numtyp', action = 'store', type = int, dest = 'num_typ_features', default = 103,
 		help = 'Number of typological features in the typological features extracted.')
-	pos_parser.add_argument('-bl', '--bertlayer', action = 'store', dest = 'bert_layer', type = int, default = 8,
+	pos_parser.add_argument('-lml', '--lmlayer', action = 'store', dest = 'lm_layer', type = int, default = 8,
 		help = 'Layer to obtain BERT representations from')
+	pos_parser.add_argument('-sc', '--scale', action = 'store', dest = 'scale', type = float, default = 0,
+		help = 'Scaling factor for biaffine attention')
 	pos_parser.add_argument('-lr', '--learningrate', action = 'store', dest = 'lr', type = float, default = 0.0005, 
 		help = 'Learning rate for optimization')
 	pos_parser.add_argument('-ep', '--numepochs', action = 'store', dest = 'num_epochs', type = int, default = 10,
 		help = 'Number of epochs of training')
 
-	return ap.parse_args()
-
 def main():
 	args = get_cmd_arguments()
 
-	assert(args.task_name in ['dep', 'pos']), 'Task must be either Dependency Parsing or POS Tagging'
+	assert(args.task_name in ['dep', 'pos']), 'Task must be either Dependency Parsing (dep) or POS Tagging (pos)'
 
-	debug = unittest.TestCase()
-	debug.assertTrue(os.path.exists(args.base_path), msg = 'Base path does not exist')	
-	debug.assertTrue(os.path.exists(args.data_path), msg = 'Data path does not exist')
+	seed = 0
+	random.seed(seed)
+	np.random.seed(seed)
+	torch.manual_seed(seed)
 
-	assert(args.encoder in ['bert', 'lstm']), 'Please choose either BERT or LSTM to build word embeddings'
+	if cuda.is_available():
+		device = 'cuda'
+		torch.cuda.manual_seed_all(seed)
+	else:
+		device = 'cpu'
+
+	print('Using device: {}'.format(device)) #Ensure on GPU!
+
+	if args.lang == 'en':
+		data_directory = 'UD_English-EWT'
+		args.data_path = os.path.join(args.data_path, data_directory)
+		args.train_filename = 'en_ewt-ud-train.conllu'
+		args.valid_filename = 'en_ewt-ud-dev.conllu'
+		args.test_filename = 'en_ewt-ud-test.conllu'
+	else:
+		raise AssertionError('Please enter a valid language')
+
+	assert(os.path.exists(args.base_path)), 'Base path does not exist'	
+	assert(os.path.exists(args.data_path)), 'Data path does not exist'
+	assert(args.encoder in ['lstm', 'lm']), 'Please choose either BERT or LSTM to build word embeddings'
 	assert(args.input_type in ['lemma', 'form']), 'Please choose an input type of form or lemma'
-	assert(args.typ_encode in ['concat', 'add_att', 'mul_att']), 'Please use attention or concatention for encoding typological features'
+
+	if args.typological:
+		assert(args.typ_encode in ['concat', 'add_att', 'mul_att']), 'Please use attention or concatention for encoding typological features'
+	if args.encoder == 'lm':
+		assert('bert' in args.lm_model_name or 'gpt2' in args.lm_model_name), 'Please choose BERT or GPT2 as the LM'
+		args.tokenizer = transformers.BertTokenizer.from_pretrained(args.lm_model_name) if 'bert' in args.lm_model_name else transformers.GPT2Tokenizer.from_pretrained(args.lm_model_name)
 
 	if args.task_name == 'dep':
-		seed = 0
-		random.seed(seed)
-		np.random.seed(seed)
-		torch.manual_seed(seed)
-
-		if args.lang == 'en':
-			directory = 'UD_English-EWT'
-			train_filename = 'en_ewt-ud-train.conllu'
-			valid_filename = 'en_ewt-ud-dev.conllu'
-			test_filename = 'en_ewt-ud-test.conllu'
-		else:
-			directory = None
-			train_filename = None
-			valid_filename = None
-			test_filename = None
-			raise AssertionError('Please enter a valid language')
-
-		dep_main(train_filename = train_filename, valid_filename = valid_filename, test_filename = test_filename, lang = args.lang, base_path = args.base_path,
-			data_path = data_path, data_directory = directory, train_model = args.train_model, input_type = args.input_type, word_embed_size = args.word_embed_size, pos_embed_size = args.pos_embed_size,
-			modelname = args.modelname, encoder = args.encoder, lstm_hidden_size = args.lstm_hidden_size, lr = args.lr, dropout = args.dropout, num_epochs = args.num_epochs, 
-			lstm_layers = args.lstm_layers, batch_size = 1, bert = args.bert, bert_layer = args.bert_layer, scale = args.scale, typological = args.typological, 
-			typ_embed_size = args.typ_embed_size, num_typ_features = args.num_typ_features, typ_feature = args.typ_feature, typ_encode = args.typ_encode, attention_hidden_size = args.attention_hidden_size,
-			device = device)
+		dep_main(args, device)
 
 	else:
-		seed = 0
-		random.seed(seed)
-		np.random.seed(seed)
-		torch.manual_seed(seed)
-
-		if args.lang == 'en':
-			directory = 'UD_English-EWT'
-			train_filename = 'en_ewt-ud-train.conllu'
-			valid_filename = 'en_ewt-ud-dev.conllu'
-			test_filename = 'en_ewt-ud-test.conllu'
-		else:
-			directory = None
-			train_filename = None
-			valid_filename = None
-			test_filename = None
-			raise AssertionError('Please enter a valid language')
-
-		pos_main(train_filename = train_filename, valid_filename = valid_filename, test_filename = test_filename, lang = args.lang, base_path = args.base_path,
-			data_path = args.data_path, data_directory = directory, train_model = args.train_model, input_type = args.input_type, word_embed_size = args.word_embed_size, modelname = args.modelname,
-			encoder = args.encoder, lstm_hidden_size = args.lstm_hidden_size, mlp_hidden_size = args.mlp_hidden_size, lr = args.lr, dropout = args.dropout, num_epochs = args.num_epochs,
-			lstm_layers = args.lstm_layers, batch_size = 1, bert = args.bert, bert_layer = args.bert_layer, typological = args.typological, typ_embed_size = args.typ_embed_size,
-			num_typ_features = args.num_typ_features, typ_feature = args.typ_feature, typ_encode = args.typ_encode, attention_hidden_size = args.attention_hidden_size,
-			device = device)
+		pos_main(args, device)
 
 if __name__ == '__main__':
 	main()

@@ -119,21 +119,30 @@ class LSTMEmbedding(nn.Module):
 
 		return outputs
 
-class BERTEmbedding(nn.Module):
+class LMEmbedding(nn.Module):
 	def __init__(self, 
-		bert, 
+		lm_model_name, 
 		typological, 
 		bert_pad_index = 0, 
 		bert_hidden_size = 768, 
 		typ_embed_size = 32, 
 		num_typ_features = 289, 
-		bert_layer = 4, 
+		lm_layer = 4, 
 		dropout = 0.25,
 		typ_encode = 'concat',
-		attention_hidden_size = 200):
+		attention_hidden_size = 200,
+		fine_tune = True):
 
-		super(BERTEmbedding, self).__init__()
-		self.lm = transformers.BertModel.from_pretrained(bert)
+		super(LMEmbedding, self).__init__()
+		self.lm_model_name = lm_model_name
+		if 'bert' in self.lm_model_name:
+			self.lm = transformers.BertModel.from_pretrained(self.lm_model_name)
+		else:
+			self.lm = transformers.GPT2Model.from_pretrained(self.lm_model_name)
+		if not fine_tune:
+			self.lm.eval()
+			for param in self.lm.base_model.parameters():
+				param.requires_grad = False
 
 		if typological:
 			self.typ = TypologicalLanguageEmbed(num_typ_features = num_typ_features, typ_embed_size = typ_embed_size, hidden_size = num_typ_features, dropout = dropout)
@@ -147,25 +156,39 @@ class BERTEmbedding(nn.Module):
 		self.dropout = nn.Dropout(dropout)
 
 		self.typological = typological 
-		self.bert_layer = bert_layer 
+		self.lm_layer = lm_layer
 		self.typ_encode = typ_encode
 
-	def forward(self, input_ids, attention_mask, lang = 'en', typ_feature = 'syntax_knn+phonology_knn+inventory_knn', device = 'cpu'):
-		lm_output = self.lm(input_ids = input_ids, attention_mask = attention_mask, output_hidden_states = True)
+	def forward(self, input_ids, sentence, lang = 'en', typ_feature = 'syntax_knn+phonology_knn+inventory_knn', device = 'cpu'):
+		lm_output = self.lm(input_ids = input_ids, output_hidden_states = True)
 
-		hidden_state = lm_output.hidden_states[self.bert_layer]
-		hidden_state = hidden_state[:, 1:-1, :]
+		hidden_state = lm_output.hidden_states[self.lm_layer]
+		if 'bert' in self.lm_model_name:
+			hidden_state = hidden_state[:, 1:-1, :]
+		else:
+			hidden_state = hidden_state[:, :-1, :]
+		outputs = self.average_subwords(hidden_state, input_ids, sentence)
 
 		if self.typological:
 			typ_embed = self.typ(lang = lang, typ_feature = typ_feature, device = device)
 			if self.typ_encode == 'concat':
-				typ_embed = typ_embed.repeat(hidden_state.size(1), 1).unsqueeze(0)
-				outputs = torch.cat([hidden_state, typ_embed], dim = 2)
+				typ_embed = typ_embed.repeat(outputs.size(1), 1).unsqueeze(0)
+				outputs = torch.cat([outputs, typ_embed], dim = 2)
 			elif self.typ_encode == 'add_att' or self.typ_encode == 'mul_att':
-				hidden_state = hidden_state.squeeze(0)
-				outputs = self.attention.forward(typ_embed = typ_embed, word_embed = hidden_state)
+				outputs = outputs.squeeze(0)
+				outputs = self.attention.forward(typ_embed = typ_embed, word_embed = outputs)
 				outputs = outputs.unsqueeze(0)
 
-		outputs = self.dropout(hidden_state)
-
+		outputs = self.dropout(outputs)
 		return outputs
+
+	def average_subwords(self, embeddings, input_ids, sentence):
+		tokenizer = transformers.BertTokenizer.from_pretrained(self.lm_model_name) if 'bert' in self.lm_model_name else transformers.GPT2Tokenizer.from_pretrained(self.lm_model_name)
+		idx = 0
+		word_embeddings = []
+		for word, in sentence:
+			subwords = tokenizer.tokenize(word)
+			word_embedding = torch.mean(embeddings[:, idx:idx+len(subwords), :], dim = 1)
+			word_embeddings.append(word_embedding)
+			idx = idx + len(subwords)
+		return torch.stack(word_embeddings, dim = 1)
