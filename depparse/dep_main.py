@@ -111,7 +111,6 @@ def dep_main(args, device):
 if __name__ == '__main__':
 	if cuda.is_available():
 		device = 'cuda'
-		torch.cuda.manual_seed_all(seed)
 	else:
 		device = 'cpu'
 	print('Using device: {}'.format(device)) #Ensure on GPU!

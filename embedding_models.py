@@ -136,9 +136,9 @@ class LMEmbedding(nn.Module):
 		super(LMEmbedding, self).__init__()
 		self.lm_model_name = lm_model_name
 		if 'bert' in self.lm_model_name:
-			self.lm = transformers.BertModel.from_pretrained(self.lm_model_name)
+			self.lm = transformers.BertModel.from_pretrained(os.path.join('/storage/vsub851/typ_embed/lm_models', self.lm_model_name))
 		else:
-			self.lm = transformers.GPT2Model.from_pretrained(self.lm_model_name)
+			self.lm = transformers.GPT2Model.from_pretrained(os.path.join('/storage/vsub851/typ_embed/lm_models', self.lm_model_name))
 		if not fine_tune:
 			self.lm.eval()
 			for param in self.lm.base_model.parameters():
