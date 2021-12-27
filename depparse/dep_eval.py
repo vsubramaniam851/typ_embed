@@ -33,7 +33,7 @@ def arc_eval(args, classifier, test_loader, device):
 
 	print('Evaluating {} model {} typological features'.format(args.modelname, typ_str))
 
-	for i, batch in tqdm(test_loader):
+	for i, batch in tqdm(enumerate(test_loader)):
 		if args.encoder == 'lstm':
 			word_batch = batch['input_data'].to(device)
 			pos_batch = batch['pos_ids'].to(device)
@@ -45,10 +45,10 @@ def arc_eval(args, classifier, test_loader, device):
 			input_ids = input_ids.to(device)
 			word_batch = batch['input_data'].to(device)
 
-			s_arc, s_rel, mask = classifier.forward(words = word_batch, input_ids = input_ids, attention_mask = attention_mask, lang = lang, typ_feature = typ_feature, device = device)
+			s_arc, s_rel, mask = classifier.forward(words = word_batch, input_ids = input_ids, lang = args.lang, typ_feature = args.typ_feature, sentence = batch['words'], device = device)
 		
-		arcs = batch['heads'].to(device)
-		rels = batch['deprel_ids'].to(device)
+		arcs = batch['heads'].squeeze(0)
+		rels = batch['deprel_ids'].squeeze(0)
 
 		arc_preds, rel_preds = classifier.decode(s_arc = s_arc, s_rel = s_rel, mask = mask)
 
@@ -107,7 +107,7 @@ if __name__ == '__main__':
 
 	train_data_loader, valid_data_loader, test_data_loader, vocab_dict, pos_dict, label_dict = dep_data_loaders(args, train_filename = train_filename, valid_filename = valid_filename, test_filename = test_filename)
 	classifier = BiaffineDependencyModel(n_words = num_words, n_pos = num_pos, n_rels = num_labels, word_embed_size = args.word_embed_size, pos_embed_size = args.pos_embed_size, lstm_hidden_size = args.lstm_hidden_size, encoder = args.encoder, lstm_layers = args.lstm_layers, 
-		lm_model_name = args.lm_model_name, dropout = args.dropout, n_lm_layer = args.lm_layer, n_arc_mlp = 500, n_rel_mlp = 100, scale = args.scale, pad_index = pad_index, 
+		lm_model_name = args.lm_model_name, dropout = args.dropout, n_lm_layer = args.lm_layer, n_arc_mlp = 500, n_rel_mlp = 100, scale = args.scale, pad_index = num_words, 
 		unk_index = 0, typological = args.typological, typ_embed_size = args.typ_embed_size, num_typ_features = args.num_typ_features, 
 		typ_encode = args.typ_encode, attention_hidden_size = args.attention_hidden_size, fine_tune = args.fine_tune)
 

@@ -21,7 +21,7 @@ import transformers
 def arc_train(args, train_loader, valid_loader, num_words, num_pos, num_labels, device):
 	pad_index = num_words
 	classifier = BiaffineDependencyModel(n_words = num_words, n_pos = num_pos, n_rels = num_labels, word_embed_size = args.word_embed_size, pos_embed_size = args.pos_embed_size, lstm_hidden_size = args.lstm_hidden_size, encoder = args.encoder, lstm_layers = args.lstm_layers, 
-		lm_model_name = args.lm_model_name, dropout = args.dropout, n_lm_layer = args.lm_layer, n_arc_mlp = 500, n_rel_mlp = 100, scale = args.scale, pad_index = pad_index, 
+		lm_model_name = args.lm_model_name, tokenizer = args.tokenizer, dropout = args.dropout, n_lm_layer = args.lm_layer, n_arc_mlp = 500, n_rel_mlp = 100, scale = args.scale, pad_index = pad_index, 
 		unk_index = 0, typological = args.typological, typ_embed_size = args.typ_embed_size, num_typ_features = args.num_typ_features, 
 		typ_encode = args.typ_encode, attention_hidden_size = args.attention_hidden_size, fine_tune = args.fine_tune)
 	optimizer = optim.Adam(classifier.parameters(), lr = args.lr)
@@ -101,7 +101,7 @@ def arc_train(args, train_loader, valid_loader, num_words, num_pos, num_labels, 
 
 	if args.save_model:
 		save_path = os.path.join(args.base_path, 'saved_models', args.modelname)
-		print('Saving model to {}').format(save_path)
+		print('Saving model to {}'.format(save_path))
 		torch.save(classifier.state_dict(), save_path)
 
 	return classifier

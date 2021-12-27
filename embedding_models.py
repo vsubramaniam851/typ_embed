@@ -122,6 +122,7 @@ class LSTMEmbedding(nn.Module):
 class LMEmbedding(nn.Module):
 	def __init__(self, 
 		lm_model_name, 
+		tokenizer,
 		typological, 
 		bert_pad_index = 0, 
 		bert_hidden_size = 768, 
@@ -158,6 +159,7 @@ class LMEmbedding(nn.Module):
 		self.typological = typological 
 		self.lm_layer = lm_layer
 		self.typ_encode = typ_encode
+		self.tokenizer = tokenizer
 
 	def forward(self, input_ids, sentence, lang = 'en', typ_feature = 'syntax_knn+phonology_knn+inventory_knn', device = 'cpu'):
 		lm_output = self.lm(input_ids = input_ids, output_hidden_states = True)
@@ -183,11 +185,11 @@ class LMEmbedding(nn.Module):
 		return outputs
 
 	def average_subwords(self, embeddings, input_ids, sentence):
-		tokenizer = transformers.BertTokenizer.from_pretrained(self.lm_model_name) if 'bert' in self.lm_model_name else transformers.GPT2Tokenizer.from_pretrained(self.lm_model_name)
+		# tokenizer = transformers.BertTokenizer.from_pretrained(self.lm_model_name) if 'bert' in self.lm_model_name else transformers.GPT2Tokenizer.from_pretrained(self.lm_model_name)
 		idx = 0
 		word_embeddings = []
 		for word, in sentence:
-			subwords = tokenizer.tokenize(word)
+			subwords = self.tokenizer.tokenize(word)
 			word_embedding = torch.mean(embeddings[:, idx:idx+len(subwords), :], dim = 1)
 			word_embeddings.append(word_embedding)
 			idx = idx + len(subwords)

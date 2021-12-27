@@ -83,7 +83,7 @@ def get_cmd_arguments_dep():
 		help = 'Layer to obtain BERT representations from')
 	ap.add_argument('-sc', '--scale', action = 'store', dest = 'scale', type = float, default = 0,
 		help = 'Scaling factor for biaffine attention')
-	ap.add_argument('-lr', '--learningrate', action = 'store', dest = 'lr', type = float, default = 0.0005, 
+	ap.add_argument('-lr', '--learningrate', action = 'store', dest = 'lr', type = float, default = 0.000005, 
 		help = 'Learning rate for optimization')
 	ap.add_argument('-ep', '--numepochs', action = 'store', dest = 'num_epochs', type = int, default = 10,
 		help = 'Number of epochs of training')
@@ -100,13 +100,13 @@ def dep_main(args, device):
 		classifier = arc_train(args, train_loader, valid_loader, len(vocab_dict), len(pos_dict), len(label_dict), device)
 	else:
 		classifier = BiaffineDependencyModel(n_words = len(vocab_dict), n_pos = len(pos_dict), n_rels = len(label_dict), word_embed_size = args.word_embed_size, pos_embed_size = args.pos_embed_size, lstm_hidden_size = args.lstm_hidden_size, encoder = args.encoder, lstm_layers = args.lstm_layers, 
-			lm_model_name = args.lm_model_name, dropout = args.dropout, n_lm_layer = args.lm_layer, n_arc_mlp = 500, n_rel_mlp = 100, scale = args.scale, pad_index = pad_index, 
+			lm_model_name = args.lm_model_name, tokenizer = args.tokenizer, dropout = args.dropout, n_lm_layer = args.lm_layer, n_arc_mlp = 500, n_rel_mlp = 100, scale = args.scale, pad_index = len(vocab_dict), 
 			unk_index = 0, typological = args.typological, typ_embed_size = args.typ_embed_size, num_typ_features = args.num_typ_features, 
 			typ_encode = args.typ_encode, attention_hidden_size = args.attention_hidden_size, fine_tune = args.fine_tune)
 		model_path = os.path.join(args.base_path, 'saved_models', args.modelname)
 		classifier.load_state_dict(torch.load(model_path))
 
-	print(arc_eval(args, test_loader, device))
+	print(arc_eval(args, classifier, test_loader, device))
 
 if __name__ == '__main__':
 	if cuda.is_available():

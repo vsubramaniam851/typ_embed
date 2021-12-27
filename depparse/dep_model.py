@@ -19,7 +19,8 @@ class BiaffineDependencyModel(nn.Module):
 		lstm_hidden_size = 400, 
 		encoder = 'lstm', 
 		lstm_layers = 3, 
-		lm_model_name = None, 
+		lm_model_name = None,
+		tokenizer = None, 
 		dropout = 0.33, 
 		n_lm_layer = 4, 
 		n_arc_mlp = 500, 
@@ -44,7 +45,7 @@ class BiaffineDependencyModel(nn.Module):
 				attention_hidden_size = attention_hidden_size)
 			n_embed = lstm_hidden_size * 2
 		elif encoder == 'lm':
-			self.encode = LMEmbedding(lm_model_name = lm_model_name, typological = typological, bert_hidden_size = 768, typ_embed_size = typ_embed_size, 
+			self.encode = LMEmbedding(lm_model_name = lm_model_name, tokenizer = tokenizer, typological = typological, bert_hidden_size = 768, typ_embed_size = typ_embed_size, 
 				num_typ_features = num_typ_features, lm_layer = n_lm_layer, typ_encode = typ_encode, attention_hidden_size = attention_hidden_size, fine_tune = True)
 			n_embed = 768
 		else:
