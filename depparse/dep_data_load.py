@@ -12,9 +12,13 @@ import torch
 from torch.utils import data
 
 class LoadConllu(object):
-	def __init__(self, data_path, filename, mode = 'train', vocab_dict = None, pos_dict = None, label_dict = None, input_type = 'lemma'):
-		file_path = os.path.join(data_path, filename)
-		word_df = conll_df(file_path, file_index = False, skip_morph = True)
+	def __init__(self, data_path, filenames, mode = 'train', vocab_dict = None, pos_dict = None, label_dict = None, input_type = 'lemma'):
+		word_df = []
+		for f in filenames:
+			file_path = os.path.join(data_path, f)
+			df = conll_df(file_path, file_index = False, skip_morph = True)
+			word_df.append(df)
+		word_df = pd.concat(word_df)
 		self.sent_parses, self.vocab_dict, self.label_dict, self.pos_dict = self.process_corpus(word_df, mode = mode, input_type = input_type, vocab_dict = vocab_dict, pos_dict = pos_dict, label_dict = label_dict)
 
 	def process_corpus(self, word_df, mode = 'train', input_type = 'form', vocab_dict = None, pos_dict = None, label_dict = None):
@@ -99,9 +103,9 @@ class DepData(data.Dataset):
 		}
 
 def dep_data_loaders(args, train_filename, valid_filename, test_filename):
-	train_conllu = LoadConllu(args.data_path, train_filename, mode = 'train')
-	valid_conllu = LoadConllu(args.data_path, valid_filename, mode = 'valid', vocab_dict = train_conllu.vocab_dict, pos_dict = train_conllu.pos_dict, label_dict = train_conllu.label_dict)
-	test_conllu = LoadConllu(args.data_path, test_filename, mode = 'test', vocab_dict = train_conllu.vocab_dict, pos_dict = train_conllu.pos_dict, label_dict = train_conllu.label_dict)
+	train_conllu = LoadConllu(args.data_path, [train_filename], mode = 'train')
+	valid_conllu = LoadConllu(args.data_path, [valid_filename], mode = 'valid', vocab_dict = train_conllu.vocab_dict, pos_dict = train_conllu.pos_dict, label_dict = train_conllu.label_dict)
+	test_conllu = LoadConllu(args.data_path, [test_filename], mode = 'test', vocab_dict = train_conllu.vocab_dict, pos_dict = train_conllu.pos_dict, label_dict = train_conllu.label_dict)
 
 	train_dep_data, valid_dep_data, test_dep_data = DepData(train_conllu.sent_parses), DepData(valid_conllu.sent_parses), DepData(test_conllu.sent_parses)
 	train_data_loader, valid_data_loader, test_data_loader = data.DataLoader(train_dep_data, batch_size = 1, shuffle = args.shuffle), data.DataLoader(valid_dep_data, batch_size = 1, shuffle = args.shuffle), data.DataLoader(test_dep_data, batch_size = 1, shuffle = args.shuffle)

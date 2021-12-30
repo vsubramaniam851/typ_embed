@@ -140,4 +140,6 @@ if __name__ == '__main__':
 	if args.encoder == 'lm':
 		assert('bert' in args.lm_model_name or 'gpt2' in args.lm_model_name), 'Please choose BERT or GPT2 as the LM'
 		args.tokenizer = transformers.BertTokenizer.from_pretrained(args.lm_model_name) if 'bert' in args.lm_model_name else transformers.GPT2Tokenizer.from_pretrained(args.lm_model_name)
+	else:
+		args.tokenizer = None
 	dep_main(args, device)
