@@ -132,7 +132,9 @@ class LMEmbedding(nn.Module):
 		dropout = 0.25,
 		typ_encode = 'concat',
 		attention_hidden_size = 200,
-		fine_tune = True):
+		fine_tune = True,
+		extract_cls = False,
+		average_sen = False):
 
 		super(LMEmbedding, self).__init__()
 		self.lm_model_name = lm_model_name
@@ -160,16 +162,29 @@ class LMEmbedding(nn.Module):
 		self.lm_layer = lm_layer
 		self.typ_encode = typ_encode
 		self.tokenizer = tokenizer
+		self.extract_cls = extract_cls
+		self.average_sen = average_sen
 
 	def forward(self, input_ids, sentence, lang = 'en', typ_feature = 'syntax_knn+phonology_knn+inventory_knn', device = 'cpu'):
 		lm_output = self.lm(input_ids = input_ids, output_hidden_states = True)
 
 		hidden_state = lm_output.hidden_states[self.lm_layer]
-		if 'bert' in self.lm_model_name:
-			hidden_state = hidden_state[:, 1:-1, :]
+		if self.extract_cls:
+			if 'bert' in self.lm_model_name:
+				hidden_state = hidden_state[:, 0, :].unsqueeze(0)
+			else:
+				hidden_state = hidden_state[:, -1, :].unsqueeze(0)
+		elif self.average_sen:
+			if 'bert' in self.lm_model_name:
+				hidden_state = torch.mean(hidden_state[:, 1:-1, :], dim = 1).unsqueeze(0)
+			else:
+				hidden_state = torch.mean(hidden_state[:, :-1:, :], dim = 1).unsqueeze(0)
 		else:
-			hidden_state = hidden_state[:, :-1, :]
-		outputs = self.average_subwords(hidden_state, input_ids, sentence)
+			if 'bert' in self.lm_model_name:
+				hidden_state = hidden_state[:, 1:-1, :]
+			else:
+				hidden_state = hidden_state[:, :-1, :]
+			outputs = self.average_subwords(hidden_state, input_ids, sentence)
 
 		if self.typological:
 			typ_embed = self.typ(lang = lang, typ_feature = typ_feature, device = device)

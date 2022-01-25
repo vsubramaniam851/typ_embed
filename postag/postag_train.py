@@ -18,7 +18,7 @@ import transformers
 
 def pos_train(args, train_loader, valid_loader, num_words, num_labels, device):
 	classifier = POSTaggingModel(n_words = num_words, n_tags = num_labels, word_embed_size = args.word_embed_size, lstm_hidden_size = args.lstm_hidden_size, encoder = args.encoder, lstm_layers = args.lstm_layers,
-		lm_model_name = args.lm_model_name, dropout = dropout, n_lm_layer = args.lm_layer, mlp_hidden_size = args.mlp_hidden_size, typological = args.typological, typ_embed_size = args.typ_embed_size, num_typ_features = args.num_typ_features, 
+		lm_model_name = args.lm_model_name, tokenizer = args.tokenizer, dropout = dropout, n_lm_layer = args.lm_layer, mlp_hidden_size = args.mlp_hidden_size, typological = args.typological, typ_embed_size = args.typ_embed_size, num_typ_features = args.num_typ_features, 
 		typ_encode = args.typ_encode, attention_hidden_size = args.attention_hidden_size, fine_tune = args.fine_tune)
 
 	optimizer = optim.Adam(classifier.parameters(), lr = args.lr)
@@ -85,8 +85,12 @@ def pos_train(args, train_loader, valid_loader, num_words, num_labels, device):
 		print('Epoch {}, valid loss = {}'.format(epoch, total_loss / len(valid_corpus)))
 	print('TRAINING IS FINISHED')
 
-	save_path = os.path.join(base_path, 'saved_models', modelname)
-	torch.save(classifier.state_dict(), save_path)
+	if args.save_model:
+		save_path = os.path.join(args.base_path, 'saved_models', args.modelname)
+		print('Saving model to {}'.format(save_path))
+		torch.save(classifier.state_dict(), save_path)
+
+	return classifier
 
 if __name__ == '__main__':
 	args = SimpleNamespace()
