@@ -16,7 +16,7 @@ from entail_model import *
 from embedding_models import *
 from entail_data_load import *
 
-def arc_eval(args, classifier, test_loader, device):
+def entail_eval(args, classifier, test_loader, device):
 	classifier = classifier.to(device)
 	classifier = classifier.double()
 	classifier.eval()
