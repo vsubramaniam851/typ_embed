@@ -53,7 +53,7 @@ def pos_train(args, train_loader, valid_loader, num_words, num_labels, device):
 
 				pos_preds = classifier.forward(words = word_batch, input_ids = input_ids, lang = args.lang, typ_feature = args.typ_feature, sentence = batch['words'], device = device)
 
-			loss = classifier.loss(pred_tags = pos_preds, tags = pos_tags)
+			loss = classifier.loss(pred_tags = pos_preds, tags = pos_batch)
 			loss.backward()
 			optimizer.step()
 			optimizer.zero_grad()
@@ -68,7 +68,7 @@ def pos_train(args, train_loader, valid_loader, num_words, num_labels, device):
 				print('Epoch {} Valid Batch {}'.format(epoch, i))
 			if encoder == 'lstm':
 				word_batch = batch['input_data'].to(device)
-				pos_batch = batch['pos_ids'].squeeze(0).to(device)
+				pos_tags = batch['pos_ids'].squeeze(0).to(device)
 
 				pos_preds = classifier.forward(words = word_batch, lang = args.lang, typ_feature = args.typ_feature, pos_tags = pos_batch, device = device)
 			else:
@@ -76,7 +76,7 @@ def pos_train(args, train_loader, valid_loader, num_words, num_labels, device):
 				input_ids = args.tokenizer.encode(sentence, return_tensors = 'pt')
 				input_ids = input_ids.to(device)
 				word_batch = batch['input_data'].to(device)
-				pos_batch = batch['pos_ids'].squeeze(0).to(device)
+				pos_tags = batch['pos_ids'].squeeze(0).to(device)
 
 				pos_preds = classifier.forward(words = word_batch, input_ids = input_ids, lang = args.lang, typ_feature = args.typ_feature, sentence = batch['words'], device = device)
 

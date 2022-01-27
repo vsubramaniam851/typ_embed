@@ -14,8 +14,8 @@ import torch.optim as optim
 
 import transformers
 
-from dep_data_load import *
-from dep_train import *
+from pos_data_load import *
+from pos_train import *
 
 class MDL_Probing(object):
 	def __init__(self, args, filenames, timesteps, device):
@@ -24,15 +24,15 @@ class MDL_Probing(object):
 		self.K = len(self.full_conllu.label_dict)
 		self.online_codelength = self.mdl_probing(args, dataloaders, device)
 	def data_loaders(self, sent_parses, timesteps):
-		dep_dataset = DepData(sent_parses)
+		pos_dataset = PosData(sent_parses)
 		index_pairs, dataloaders = [], []
 		for t in timesteps:
-			data_idx = int(t*0.01*len(dep_dataset))
+			data_idx = int(t*0.01*len(pos_dataset))
 			train_idx = round(0.5*data_idx)
 			index_pairs.append((train_idx, data_idx))
 		for train_idx, test_idx in index_pairs:
-			train_dep_dataset, test_dep_dataset = data.Subset(dep_dataset, range(0, train_idx)), data.Subset(dep_dataset, range(train_idx, test_idx))
-			dataloaders.append((data.DataLoader(train_dep_dataset, batch_size = 1, shuffle = False), data.DataLoader(test_dep_dataset, batch_size = 1, shuffle = False)))
+			train_pos_dataset, test_pos_dataset = data.Subset(en_dataset, range(0, train_idx)), data.Subset(en_dataset, range(train_idx, test_idx))
+			dataloaders.append((data.DataLoader(train_pos_dataset, batch_size = 1, shuffle = False), data.DataLoader(test_pos_dataset, batch_size = 1, shuffle = False)))
 		return dataloaders
 	def mdl_training(self, args, train_loader, classifier, optimizer, device):
 		print('Beginning Training')
@@ -43,23 +43,19 @@ class MDL_Probing(object):
 			for i, batch in enumerate(train_loader):
 				if args.encoder == 'lstm':
 					word_batch = batch['input_data'].to(device)
-					pos_batch = batch['pos_ids'].to(device)
-					arcs = batch['heads'].to(device)
-					rels = batch['deprel_ids'].to(device)
 
-					s_arc, s_rel, mask = classifier.forward(words = word_batch, lang = args.lang, typ_feature = args.typ_feature, pos_tags = pos_batch, device = device)
+					pos_preds = classifier.forward(words = word_batch, lang = args.lang, typ_feature = args.typ_feature, device = device)
 
 				else:
 					sentence = ' '.join([x[0] for x in batch['words']])
 					input_ids = args.tokenizer.encode(sentence, return_tensors = 'pt')
 					input_ids = input_ids.to(device)
 					word_batch = batch['input_data'].to(device)
-					arcs = batch['heads'].to(device)
-					rels = batch['deprel_ids'].to(device)
 
-					s_arc, s_rel, mask = classifier.forward(words = word_batch, input_ids = input_ids, lang = args.lang, typ_feature = args.typ_feature, sentence = batch['words'], device = device)
+					pos_preds = classifier.forward(words = word_batch, input_ids = input_ids, lang = args.lang, typ_feature = args.typ_feature, sentence = batch['words'], device = device)
 
-				loss = classifier.loss(s_arc = s_arc, s_rel = s_rel, arcs = arcs, rels = rels, mask = mask)
+				pos_tags = batch['pos_ids'].squeeze(0).to(device)
+				loss = classifier.loss(pred_tags = pos_preds, tags = pos_tags)
 				loss.backward()
 				optimizer.step()
 				optimizer.zero_grad()
@@ -76,9 +72,8 @@ class MDL_Probing(object):
 		for i, batch in enumerate(test_loader):
 			if args.encoder == 'lstm':
 				word_batch = batch['input_data'].to(device)
-				pos_batch = batch['pos_ids'].to(device)
 
-				s_arc, s_rel, mask = classifier.forward(words = word_batch, lang = args.lang, typ_feature = args.typ_feature, pos_tags = pos_batch, device = device)
+				pos_preds = classifier.forward(words = word_batch, lang = args.lang, typ_feature = args.typ_feature, device = device)
 
 			else:
 				sentence = ' '.join([x[0] for x in batch['words']])
@@ -88,26 +83,19 @@ class MDL_Probing(object):
 
 				s_arc, s_rel, mask = classifier.forward(words = word_batch, input_ids = input_ids, lang = args.lang, typ_feature = args.typ_feature, sentence = batch['words'], device = device)
 			
-			arcs = batch['heads'].to(device)
-			rels = batch['deprel_ids'].to(device)
+			pos_tags = batch['pos_ids']
+			pos_logits = pos_preds.argmax(-1)
 
-			arc_preds = s_arc.argmax(-1)
-			rel_dists = []
-			for i in range(len(arc_preds[0])):
-				idx = arc_preds[0][i]
-				rel_dists.append(s_rel[:, i, idx, :])
-			rel_logits = torch.stack(rel_dists, dim = 0).squeeze(1)
-			rel_probs = nn.functional.softmax(rel_logits, dim = 1)
+			pos_probs = nn.functional.softmax(pos_logits, dim = 1)
 
-			for i, rel in enumerate(rels.squeeze(0)):
-				prob_val = rel_probs[i, rel].item()
+			for i, pos in enumerate(pos_tags.squeeze(0)):
+				prob_val = pos_probs[i, rel].item()
 				codelength += np.log2(prob_val)
 		return codelength
 	def mdl_probing(self, args, dataloaders, device):
 		term1 = 0.001*np.log2(self.K)
-		classifier = BiaffineDependencyModel(n_words = len(self.full_conllu.vocab_dict), n_pos = len(self.full_conllu.pos_dict), n_rels = self.K, word_embed_size = args.word_embed_size, pos_embed_size = args.pos_embed_size, lstm_hidden_size = args.lstm_hidden_size, encoder = args.encoder, lstm_layers = args.lstm_layers, 
-			lm_model_name = args.lm_model_name, tokenizer = args.tokenizer, dropout = args.dropout, n_lm_layer = args.lm_layer, n_arc_mlp = 500, n_rel_mlp = 100, scale = args.scale, pad_index = len(self.full_conllu.vocab_dict), 
-			unk_index = 0, typological = args.typological, typ_embed_size = args.typ_embed_size, num_typ_features = args.num_typ_features, 
+		classifier = POSTaggingModel(n_words = num_words, n_tags = num_labels, word_embed_size = args.word_embed_size, lstm_hidden_size = args.lstm_hidden_size, encoder = args.encoder, lstm_layers = args.lstm_layers,
+			lm_model_name = args.lm_model_name, tokenizer = args.tokenizer, dropout = dropout, n_lm_layer = args.lm_layer, mlp_hidden_size = args.mlp_hidden_size, typological = args.typological, typ_embed_size = args.typ_embed_size, num_typ_features = args.num_typ_features, 
 			typ_encode = args.typ_encode, attention_hidden_size = args.attention_hidden_size, fine_tune = args.fine_tune)
 		optimizer = optim.Adam(classifier.parameters(), lr = args.lr)
 		classifier = classifier.double()
@@ -146,7 +134,7 @@ if __name__ == '__main__':
 	device = 'cuda' if cuda.is_available() else 'cpu'
 
 	typ_str = 'with ' + args.typ_feature if args.typological else 'without'
-	print('Beginning MDL Evaluation on Dependency Parsing on device {} {} typological features on language {} using encoder {}'.format(device, typ_str, args.lang, args.encoder))
+	print('Beginning MDL Evaluation on POS Tagging on device {} {} typological features on language {} using encoder {}'.format(device, typ_str, args.lang, args.encoder))
 
 	mdl_probing = MDL_Probing(args, filenames, timesteps, device)
 	print(mdl_probing.online_codelength)

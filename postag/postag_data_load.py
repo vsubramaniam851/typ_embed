@@ -73,15 +73,15 @@ class LoadConllu(object):
 		return pd.concat(sent_parses, keys = [i for i in range(len(sent_parses))]), vocab_dict, label_dict
 
 class PosData(data.Dataset):
-	def __init__(self, dep_df):
-		self.dep_df = dep_df 
+	def __init__(self, pos_df):
+		self.pos_df = pos_df 
 	def __len__(self):
-		return len(self.dep_df.index.levels[0])
+		return len(self.pos_df.index.levels[0])
 	def __getitem__(self, idx):
 		return {
-			'words': self.dep_df.loc[idx, 'sent'].tolist(),
-			'input_data': torch.tensor(self.dep_df.loc[idx, 'input_data'].tolist()),
-			'pos_ids': torch.tensor(self.dep_df.loc[idx, 'pos_ids'].tolist()),		
+			'words': self.pos_df.loc[idx, 'sent'].tolist(),
+			'input_data': torch.tensor(self.pos_df.loc[idx, 'input_data'].tolist()),
+			'pos_ids': torch.tensor(self.pos_df.loc[idx, 'pos_ids'].tolist()),		
 		}
 
 def pos_data_loaders(args, train_filename, valid_filename, test_filename):
@@ -90,7 +90,7 @@ def pos_data_loaders(args, train_filename, valid_filename, test_filename):
 	test_conllu = LoadConllu(args.data_path, test_filename, mode = 'test', vocab_dict = train_conllu.vocab_dict, label_dict = train_conllu.label_dict)
 
 	train_pos_data, valid_pos_data, test_pos_data = PosData(train_conllu.sent_parses), PosData(valid_conllu.sent_parses), PosData(test_conllu.sent_parses)
-	train_data_loader, valid_data_loader, test_data_loader = data.DataLoader(train_dep_data, batch_size = 1, shuffle = args.shuffle), data.DataLoader(valid_dep_data, batch_size = 1, shuffle = args.shuffle), data.DataLoader(test_dep_data, batch_size = 1, shuffle = args.shuffle)
+	train_data_loader, valid_data_loader, test_data_loader = data.DataLoader(train_pos_data, batch_size = 1, shuffle = args.shuffle), data.DataLoader(valid_pos_data, batch_size = 1, shuffle = args.shuffle), data.DataLoader(test_pos_data, batch_size = 1, shuffle = args.shuffle)
 	return train_data_loader, valid_data_loader, test_data_loader, train_conllu.vocab_dict, train_conllu.label_dict
 
 if __name__ == '__main__':

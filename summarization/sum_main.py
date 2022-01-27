@@ -11,11 +11,11 @@ import lang2vec.lang2vec as l2v
 import torch
 import torch.cuda as cuda
 
-from entail_data_load import *
-from entail_train import *
-from entail_eval import *
+from sum_data_load import *
+from sum_train import *
+from sum_eval import *
 
-def get_cmd_arguments_entail():
+def get_cmd_arguments_sum():
 	ap = argparse.ArgumentParser()
 
 	ap.add_argument('-p', '--path', action = 'store', type = str, dest = 'base_path', default = './',
@@ -27,10 +27,10 @@ def get_cmd_arguments_entail():
 	ap.add_argument('-ev', '--eval', action = 'store_false', dest = 'train_model', 
 		help = 'Evaluate a pre-existing model, saved in saved_models directory in the entailment directory')
 	ap.set_defaults(train_model = False)
-	ap.add_argument('-m', '--model', action = 'store', type = str, dest = 'modelname', default = 'en_model.pt', 
+	ap.add_argument('-m', '--model', action = 'store', type = str, dest = 'modelname', default = 'sum_model.pt', 
 		help = 'Name of saved model that is either being trained or being evaluated. Most be stored in saved_models directory')
 	ap.add_argument('-l', '--lang', action = 'store', type = str, dest = 'lang', default = 'en',
-		help = 'Language to run entailment model on')
+		help = 'Language to run summarization model on')
 	ap.add_argument('-ty', '--typological', action = 'store_true', dest = 'typological',
 		help = 'Include typological features in training')
 	ap.add_argument('-nty', '--notypological', action = 'store_false', dest = 'typological',
@@ -52,8 +52,12 @@ def get_cmd_arguments_entail():
 	ap.set_defaults(save_model = True)
 
 	#Model Hyperparameters
+	ap.add_argument('-lhs', '--lstmsize', action = 'store', dest = 'lstm_hidden_size', type = int, default = 400, 
+		help = 'LSTM Hidden size when using encoder LSTM')
 	ap.add_argument('-ahs', '--attentionsize', action = 'store', dest = 'attention_hidden_size', type = int, default = 200,
 		help = 'Multiplicative Attention Hidden Size')
+	ap.add_argument('-ll', '--lstmlayers', action = 'store', dest = 'lstm_layers', type = int, default = 3,
+		help = 'Number of LSTM Layers in LSTM encoder')
 	ap.add_argument('-dr', '--dropout', action = 'store', dest = 'dropout', type = float, default = 0.33,
 		help = 'Dropout probability to be used in all components of model')
 	ap.add_argument('-lm', '--lm_model_name', action = 'store', dest = 'lm_model_name', type = str, default = 'bert-base-uncased',
@@ -71,22 +75,23 @@ def get_cmd_arguments_entail():
 
 	return ap.parse_args()
 
-def en_main(args, device):
-	print('Starting Entailment Identification')
+def sum_main(args, device):
+	print('Starting Extractive Text Summarization')
 
 	print('Loading data')
-	en_train_loader, en_val_loader, en_test_loader = entail_dataloaders(args.data_path, args.train_split, args.val_split)
+	sum_train_loader, sum_val_loader, sum_test_loader = sum_dataloaders(args.data_path, args.train_split, args.val_split)
 	print('Data loading complete')
 	if args.train_model:
-		classifier = entail_train(args, train_loader, valid_loader, device)
+		classifier = sum_train(args, train_loader, valid_loader, device)
 	else:
-		classifier = EnMLP(n_rels = num_labels, tokenizer = args.tokenizer, lm_model_name = args.lm_model_name, model_type = args.model_type, typological = args.typological, 
-			typ_embed_size = args.typ_embed_size, num_typ_features = args.num_typ_features, typ_encode = args.typ_encode, n_lm_layer = args.n_lm_layer, attention_hidden_size = args.attention_hidden_size,
-			fine_tune = args.fine_tune, extract_cls = args.extract_cls, average_sen = args.average_sen, mlp_hidden_size = args.mlp_hidden_size, dropout = args.dropout)
+		classifier = SumModel(lm_model_name = args.lm_model_name, typological = args.typological, typ_embed_size = args.typ_embed_size, 
+			num_typ_features = args.num_typ_features, typ_encode = args.typ_encode, num_rnn_layers = args.num_rnn_layers, n_lm_layer = args.n_lm_layer, 
+			attention_hidden_size = args.attention_hidden_size, summarization = args.summarization, rnn_hidden_size = args.rnn_hidden_size, 
+			dropout = args.dropout)
 		model_path = os.path.join(args.base_path, 'saved_models', args.modelname)
 		classifier.load_state_dict(torch.load(model_path))
 
-	print(entail_eval(args, classifier, test_loader, device))
+	print(sum_eval(args, test_loader, classifier, device))
 
 if __name__ == '__main__':
 	if cuda.is_available():
@@ -110,4 +115,4 @@ if __name__ == '__main__':
 	assert(args.encoder in ['lm']), 'Please choose either BERT or LSTM to build word embeddings'
 	assert('bert' in args.lm_model_name or 'gpt2' in args.lm_model_name), 'Please choose BERT or GPT2 as the LM'
 	args.tokenizer = transformers.BertTokenizer.from_pretrained(args.lm_model_name) if 'bert' in args.lm_model_name else transformers.GPT2Tokenizer.from_pretrained(args.lm_model_name)
-	en_main(args, device)
+	sum_main(args, device)

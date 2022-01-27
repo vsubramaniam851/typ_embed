@@ -134,7 +134,8 @@ class LMEmbedding(nn.Module):
 		attention_hidden_size = 200,
 		fine_tune = True,
 		extract_cls = False,
-		average_sen = False):
+		average_sen = False,
+		summarization = False):
 
 		super(LMEmbedding, self).__init__()
 		self.lm_model_name = lm_model_name
@@ -164,6 +165,7 @@ class LMEmbedding(nn.Module):
 		self.tokenizer = tokenizer
 		self.extract_cls = extract_cls
 		self.average_sen = average_sen
+		self.summarization = summarization
 
 	def forward(self, input_ids, sentence, lang = 'en', typ_feature = 'syntax_knn+phonology_knn+inventory_knn', device = 'cpu'):
 		lm_output = self.lm(input_ids = input_ids, output_hidden_states = True)
@@ -179,6 +181,8 @@ class LMEmbedding(nn.Module):
 				hidden_state = torch.mean(hidden_state[:, 1:-1, :], dim = 1).unsqueeze(0)
 			else:
 				hidden_state = torch.mean(hidden_state[:, :-1:, :], dim = 1).unsqueeze(0)
+		elif self.summarization:
+			pass
 		else:
 			if 'bert' in self.lm_model_name:
 				hidden_state = hidden_state[:, 1:-1, :]

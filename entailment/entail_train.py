@@ -40,13 +40,13 @@ def entail_train(args, train_loader, valid_loader, num_labels, device):
 		classifier.train()
 		for i, batch in enumerate(train_loader):
 			if i%1000 == 0:
-				print('Epoch {} Valid Batch {}'.format(epoch, i))
+				print('Epoch {} Train Batch {}'.format(epoch, i))
 
 			sent1 = batch['sentence_A_tokens'].to(device)
 			sent2 = batch['sentence_B_tokens'].to(device)
 			label = batch['entailment_label'].to(device)
 
-			entail_pred = classifier.forward(sent1, sent2, lang = args.lang, typ_feature = arg.typ_feature, device = device)
+			entail_pred = classifier.forward(sent1, sent2, lang = args.lang, typ_feature = arg.typ_feature, device = args.device)
 
 			loss = classifier.loss(pred_label = entail_pred, label = label)
 			loss.backward()
