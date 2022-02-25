@@ -14,7 +14,7 @@ This repository contains the code for incorporating typological feature informat
 We use four different datasets in this model. Each of the links to download them are provided here:
 * Dependency Parsing and POS Tagging: Download CoNLL-U English_EWT dataset from https://universaldependencies.org/
 * Entailment Classification: SICK dataset from https://marcobaroni.org/composes/sick.html
-* Extractive Text Summarization: BBC News Summary dataset from https://www.kaggle.com/pariza/bbc-news-summary
+* Extractive Text Summarization: BBC News Summary dataset from https://www.kaggle.com/pariza/bbc-news-summary \
 Once downloaded, place these in a directory called `datasets` in the `typ_embed` directory.
 
 ## Install
