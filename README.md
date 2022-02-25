@@ -40,8 +40,8 @@ All modifiable parameters are described in the typ_embed.py file. These include 
 
 
 ## Citations
-[1] T. Dozat and C. Manning. (2017). Deep Biaffine Attention for Neural Dependency Parsing (https://arxiv.org/abs/1611.01734)
-[2] Y. Liu. (2019). Fine-tune BERT for Extractive Summarization (https://arxiv.org/abs/1903.10318)
-[3] MC. de Marneffe et. al. (2021) Universal Dependencies (https://direct.mit.edu/coli/article/47/2/255/98516/Universal-Dependencies)
-[4] D. Greene and P. Cunnigham. (2006). Practical Solutions to the Problem of Diagonal Dominance in Kernel Document Clustering (http://mlg.ucd.ie/files/publications/greene06icml.pdf)
+[1] T. Dozat and C. Manning. (2017). Deep Biaffine Attention for Neural Dependency Parsing (https://arxiv.org/abs/1611.01734) \
+[2] Y. Liu. (2019). Fine-tune BERT for Extractive Summarization (https://arxiv.org/abs/1903.10318) \
+[3] MC. de Marneffe et. al. (2021) Universal Dependencies (https://direct.mit.edu/coli/article/47/2/255/98516/Universal-Dependencies) \
+[4] D. Greene and P. Cunnigham. (2006). Practical Solutions to the Problem of Diagonal Dominance in Kernel Document Clustering (http://mlg.ucd.ie/files/publications/greene06icml.pdf) \
 [5] Marellei et. al. (2014). A SICK cure for evaluation of compositional distributional semantic models (https://aclanthology.org/L14-1314.pdf)
